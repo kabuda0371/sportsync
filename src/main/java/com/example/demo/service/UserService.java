@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.demo.dto.UserRegisterDTO;
 import com.example.demo.entity.User;
+import com.example.demo.vo.UserVO;
 
 public interface UserService extends IService<User> {
     
@@ -11,11 +12,18 @@ public interface UserService extends IService<User> {
      * @param registerDTO 注册信息DTO
      * @return 注册成功的用户信息
      */
-    User register(UserRegisterDTO registerDTO);
+    UserVO register(UserRegisterDTO registerDTO);
     /**
      * 用户登录
      * @param loginDTO 登录信息DTO
      * @return 登录成功的用户信息
      */
-    User login(com.example.demo.dto.UserLoginDTO loginDTO);
+    UserVO login(com.example.demo.dto.UserLoginDTO loginDTO);
+
+    /**
+     * 获取当前登录用户信息
+     * @param userId 用户 ID
+     * @return 用户信息
+     */
+    UserVO getUserInfo(Long userId);
 }

@@ -21,4 +21,7 @@ public class UserVO {
     
     @Schema(description = "账号状态", example = "approved")
     private String accountStatus;
+
+    @Schema(description = "JWT Token", example = "eyJhbGciOiJIUzI1NiJ9...")
+    private String token;
 }
