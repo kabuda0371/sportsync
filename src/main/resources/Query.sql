@@ -128,7 +128,7 @@ CREATE TABLE bookings (
     -- 预订结束时间
     end_time TIME NOT NULL,
     -- 预订状态(待审批、已批准、已拒绝、已取消)
-    status VARCHAR(20) DEFAULT 'PENDING' NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    status VARCHAR(20) DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
     -- 记录创建时间
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- 记录更新时间
@@ -146,10 +146,14 @@ INSERT INTO facilities (name, type, description, usage_guidelines, capacity_limi
 -- 插入一些默认的预订测试数据 (假设我们已经有一个 user_id=1 的会员)
 -- 注意：运行这段 SQL 之前请确保 users 表中已经存在 user_id=1 的记录，否则会有外键约束或者逻辑错误
 INSERT INTO bookings (user_id, facility_id, booking_date, start_time, end_time, status) VALUES
-(1, 1, CURRENT_DATE, '10:00:00', '11:00:00', 'APPROVED'),
-(1, 1, CURRENT_DATE + INTERVAL 1 DAY, '14:00:00', '15:00:00', 'PENDING'),
-(1, 3, CURRENT_DATE + INTERVAL 2 DAY, '18:00:00', '20:00:00', 'APPROVED');
+(1, 1, CURRENT_DATE, '10:00:00', '11:00:00', 'approved'),
+(1, 1, CURRENT_DATE + INTERVAL 1 DAY, '14:00:00', '15:00:00', 'pending'),
+(1, 3, CURRENT_DATE + INTERVAL 2 DAY, '18:00:00', '20:00:00', 'approved');
 
+INSERT INTO users (role, email, password_hash, name, account_status, auth_provider)
+VALUES ('admin', 'admin@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Admin User', 'approved', 'local');
+
+drop table bookings;
 show tables;
 show create table users;
 select * from users;

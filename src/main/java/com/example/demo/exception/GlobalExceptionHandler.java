@@ -61,6 +61,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
-        return Result.error(400, "日期参数格式错误，请检查输入数据的格式");
+        return Result.error(400, "参数格式错误，请检查输入数据的格式");
     }
 }

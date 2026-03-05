@@ -27,7 +27,7 @@ public class BookingVO {
     private LocalTime startTime;
     @Schema(description = "结束时间")
     private LocalTime endTime;
-    @Schema(description = "预订状态 (PENDING, APPROVED, REJECTED, CANCELLED)")
+    @Schema(description = "预订状态 (pending, approved, rejected, cancelled)")
     private String status;
     @Schema(description = "创建时间")
     private LocalDateTime createdAt;

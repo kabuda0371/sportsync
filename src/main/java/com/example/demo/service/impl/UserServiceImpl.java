@@ -14,9 +14,10 @@ import com.example.demo.enums.UserRoleEnum;
 import com.example.demo.mapper.UserMapper;
 import com.example.demo.service.UserService;
 import com.example.demo.vo.UserVO;
+import com.example.demo.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.mindrot.jbcrypt.BCrypt;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final UserConverter userConverter;
     private final LoginRateLimiter loginRateLimiter;
     private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -40,8 +42,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 彻底消灭 Check-Then-Act 的竞态条件漏洞
         // 依托数据库层面的 email UNIQUE 唯一索引进行硬拦截在 try catch 中处理
 
-        // 2. 密码加密 (使用 jbcrypt)
-        String encryptedPassword = BCrypt.hashpw(registerDTO.getPassword(), BCrypt.gensalt());
+        // 2. 密码加密 (使用 Spring Security的 PasswordEncoder)
+        String encryptedPassword = passwordEncoder.encode(registerDTO.getPassword());
 
         // 3. 构建用户实体并保存 (使用 Builder 模式)
         User user = User.builder()
@@ -68,7 +70,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         log.info("用户注册成功，ID: {}", user.getId());
         UserVO userVO = userConverter.toVO(user);
-        userVO.setToken(jwtUtil.generateToken(user.getId()));
+        userVO.setToken(jwtUtil.generateToken(user.getId(), user.getRole()));
         return userVO;
     }
 
@@ -89,7 +91,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 2. 校验用户是否存在
         if (user == null) {
             // 防止计时攻击 (Timing Attack)：即使账号不存在，也进行一次耗时的哈希计算，抹平响应时间差异
-            BCrypt.hashpw(loginDTO.getPassword(), BCrypt.gensalt());
+            passwordEncoder.encode(loginDTO.getPassword());
             loginRateLimiter.recordFailedAttempt(email); // 不要放过爆破不存在邮箱的恶意流量
             throw new BusinessException("邮箱或密码错误！"); // 模糊提示
         }
@@ -111,7 +113,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 4. 断开与数据库的关联依赖（当前类 login() 没有 @Transactional 注解，由于 MyBatis 的 session 机制，在 lambdaQuery 执行完后，底层 Connection 会被及时释放回连接池，只有在有 @Transactional 长事务包裹时，连接才会被一直挂起）
         // 这里进行耗时的 CPU 密集型计算（Bcrypt）是安全的，不会阻塞连接池
-        if (!BCrypt.checkpw(loginDTO.getPassword(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPasswordHash())) {
             loginRateLimiter.recordFailedAttempt(email);
             throw new BusinessException("邮箱或密码错误！");
         }
@@ -123,7 +125,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 6. 返回查找到的用户信息并生成 token
         UserVO userVO = userConverter.toVO(user);
-        userVO.setToken(jwtUtil.generateToken(user.getId()));
+        userVO.setToken(jwtUtil.generateToken(user.getId(), user.getRole()));
         return userVO;
     }
 
@@ -134,5 +136,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException("用户不存在！");
         }
         return userConverter.toVO(user);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deactivateAccount(Long userId) {
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException(404, "用户不存在");
+        }
+        user.setAccountStatus(AccountStatusEnum.SUSPENDED.getValue());
+        this.updateById(user);
+        log.info("用户已注销账号，ID: {}", userId);
     }
 }

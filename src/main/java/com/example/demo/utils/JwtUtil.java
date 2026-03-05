@@ -31,14 +31,16 @@ public class JwtUtil {
      * 生成 JWT Token
      *
      * @param userId 用户的 ID
+     * @param role   用户的角色
      * @return JWT 字符串
      */
-    public String generateToken(Long userId) {
+    public String generateToken(Long userId, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
+                .claim("role", role) // 添加角色信息到 payload
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -73,6 +75,17 @@ public class JwtUtil {
     public Long getUserIdFromToken(String token) {
         Claims claims = parseToken(token);
         return Long.parseLong(claims.getSubject());
+    }
+
+    /**
+     * 从 Token 中提取 角色信息
+     *
+     * @param token JWT 字符串
+     * @return 角色字符串 (e.g., "member", "staff")
+     */
+    public String getRoleFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("role", String.class);
     }
 
     /**

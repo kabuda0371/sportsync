@@ -26,4 +26,10 @@ public interface UserService extends IService<User> {
      * @return 用户信息
      */
     UserVO getUserInfo(Long userId);
+
+    /**
+     * 注销当前用户账号（软删除，将账号状态置为 suspended）
+     * @param userId 用户 ID
+     */
+    void deactivateAccount(Long userId);
 }

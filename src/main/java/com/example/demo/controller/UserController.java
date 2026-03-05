@@ -1,7 +1,7 @@
 package com.example.demo.controller;
 
-import com.example.demo.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -9,8 +9,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
-
-import java.util.List;
 
 import com.example.demo.dto.UserRegisterDTO;
 import com.example.demo.dto.UserLoginDTO;
@@ -49,5 +47,13 @@ public class UserController {
         Long userId = UserContext.getUserId();
         UserVO userVO = userService.getUserInfo(userId);
         return Result.success("获取用户信息成功", userVO);
+    }
+
+    @DeleteMapping("/me")
+    @Operation(summary = "注销账号", description = "会员注销自己的账号，账号状态将被设置为 suspended，注销后无法再登录")
+    public Result<Void> deactivateAccount() {
+        Long userId = UserContext.getUserId();
+        userService.deactivateAccount(userId);
+        return Result.success("账号已注销", null);
     }
 }

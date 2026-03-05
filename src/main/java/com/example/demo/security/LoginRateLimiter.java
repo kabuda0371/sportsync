@@ -48,7 +48,7 @@ public class LoginRateLimiter {
         String attemptKey = ATTEMPT_KEY_PREFIX + email;
         String lockKey = LOCK_KEY_PREFIX + email;
 
-        // 递增失败次数，如果 key 不存在则初始化为 1
+        // 递增失败次数，如果 key 不存在则初始化为 1 
         Long count = stringRedisTemplate.opsForValue().increment(attemptKey);
         
         // 如果是第一次错误，设置过期时间为 24 小时
