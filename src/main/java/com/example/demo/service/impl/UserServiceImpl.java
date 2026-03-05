@@ -1,6 +1,7 @@
 package com.example.demo.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.demo.common.UserContext;
 import com.example.demo.exception.BusinessException;
 import com.example.demo.converter.UserConverter;
 import com.example.demo.utils.JwtUtil;
@@ -47,6 +48,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .email(registerDTO.getEmail())
                 .passwordHash(encryptedPassword) // 密码密文存入 passwordHash 字段
                 .name(registerDTO.getName())
+                .dateOfBirth(registerDTO.getDateOfBirth())
+                .address(registerDTO.getAddress())
                 // constraint users_chk_1: role in ('member', 'staff', 'admin')
                 .role(UserRoleEnum.MEMBER.getValue()) // 默认分配普通会员角色
                 // constraint users_chk_2: account_status in ('pending', 'approved', 'suspended')

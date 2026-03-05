@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 /**
  * 全局异常处理器
@@ -51,7 +52,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusinessException(BusinessException e) {
-        // 直接把你的业务提示语返回给前端，状态码可以是 400
-        return Result.error(400, e.getMessage());
+        // 返回 BusinessException 中携带的自定义状态码，如果没有指定则默认为 400
+        return Result.error(e.getCode(), e.getMessage());
+    }
+
+    /**
+     * 处理 JSON 解析异常，例如日期格式错误等
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        return Result.error(400, "日期参数格式错误，请检查输入数据的格式");
     }
 }
