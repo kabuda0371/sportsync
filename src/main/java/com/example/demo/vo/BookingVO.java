@@ -29,6 +29,12 @@ public class BookingVO {
     private LocalTime endTime;
     @Schema(description = "预订状态 (pending, approved, rejected, cancelled)")
     private String status;
+    @Schema(description = "活动描述，会员提交预订时填写的预期活动内容")
+    private String activityDescription;
+    @Schema(description = "工作人员审批备注")
+    private String staffNote;
+    @Schema(description = "建议替代设施ID（当拒绝时工作人员可提供替代方案）")
+    private Long suggestedFacilityId;
     @Schema(description = "创建时间")
     private LocalDateTime createdAt;
 }

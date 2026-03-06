@@ -25,4 +25,8 @@ public class FacilityVO {
     private Integer capacityLimit;
     @Schema(description = "每次预订限制时长(分钟)")
     private Integer timeSlotLimitMinutes;
+    @Schema(description = "指派管理员ID")
+    private Long assignedStaffId;
+    @Schema(description = "指派管理员姓名")
+    private String assignedStaffName;
 }

@@ -32,4 +32,11 @@ public interface UserService extends IService<User> {
      * @param userId 用户 ID
      */
     void deactivateAccount(Long userId);
+
+    /**
+     * 管理员更新用户状态
+     * @param userId 用户 ID
+     * @param status 新的账号状态
+     */
+    void updateUserStatus(Long userId, String status);
 }

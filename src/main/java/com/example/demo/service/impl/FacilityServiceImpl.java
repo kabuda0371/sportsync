@@ -5,14 +5,20 @@ import com.example.demo.entity.Facility;
 import com.example.demo.mapper.FacilityMapper;
 import com.example.demo.service.FacilityService;
 import com.example.demo.vo.FacilityVO;
+import com.example.demo.dto.FacilityDTO;
 import com.example.demo.exception.BusinessException;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
+import com.example.demo.entity.User;
+import com.example.demo.enums.UserRoleEnum;
+import com.example.demo.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> implements FacilityService {
+
+    @Autowired
+    private UserService userService;
 
     @Override
     public List<FacilityVO> getAllFacilities() {
@@ -30,8 +36,68 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
         return convertToVO(facility);
     }
 
+    @Override
+    public void createFacility(FacilityDTO dto) {
+        Facility facility = Facility.builder()
+                .name(dto.getName())
+                .type(dto.getType())
+                .description(dto.getDescription())
+                .usageGuidelines(dto.getUsageGuidelines())
+                .capacityLimit(dto.getCapacityLimit())
+                .timeSlotLimitMinutes(dto.getTimeSlotLimitMinutes())
+                .assignedStaffId(dto.getAssignedStaffId())
+                .build();
+        this.save(facility);
+    }
+
+    @Override
+    public void updateFacility(Long id, FacilityDTO dto) {
+        Facility existingFacility = this.getById(id);
+        if (existingFacility == null) {
+            throw new BusinessException(404, "没有此设备");
+        }
+        existingFacility.setName(dto.getName());
+        existingFacility.setType(dto.getType());
+        existingFacility.setDescription(dto.getDescription());
+        existingFacility.setUsageGuidelines(dto.getUsageGuidelines());
+        existingFacility.setCapacityLimit(dto.getCapacityLimit());
+        existingFacility.setTimeSlotLimitMinutes(dto.getTimeSlotLimitMinutes());
+        existingFacility.setAssignedStaffId(dto.getAssignedStaffId());
+        
+        this.updateById(existingFacility);
+    }
+
+    @Override
+    public void deleteFacility(Long id) {
+        Facility existingFacility = this.getById(id);
+        if (existingFacility == null) {
+            throw new BusinessException(404, "没有此设备");
+        }
+        this.removeById(id);
+    }
+
+    @Override
+    public void assignStaff(Long facilityId, Long staffId) {
+        Facility facility = this.getById(facilityId);
+        if (facility == null) {
+            throw new BusinessException(404, "没有此设备");
+        }
+        
+        User staff = userService.getById(staffId);
+        if (staff == null) {
+            throw new BusinessException(404, "没有此用户");
+        }
+        
+        if (!UserRoleEnum.STAFF.getValue().equals(staff.getRole())) {
+            throw new BusinessException(400, "该用户不是员工，无法分配");
+        }
+        
+        facility.setAssignedStaffId(staffId);
+        this.updateById(facility);
+    }
+
     private FacilityVO convertToVO(Facility facility) {
-        return FacilityVO.builder()
+        FacilityVO vo = FacilityVO.builder()
                 .id(facility.getId())
                 .name(facility.getName())
                 .type(facility.getType())
@@ -39,6 +105,15 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
                 .usageGuidelines(facility.getUsageGuidelines())
                 .capacityLimit(facility.getCapacityLimit())
                 .timeSlotLimitMinutes(facility.getTimeSlotLimitMinutes())
+                .assignedStaffId(facility.getAssignedStaffId())
                 .build();
+                
+        if (facility.getAssignedStaffId() != null) {
+            User staff = userService.getById(facility.getAssignedStaffId());
+            if (staff != null) {
+                vo.setAssignedStaffName(staff.getName());
+            }
+        }
+        return vo;
     }
 }

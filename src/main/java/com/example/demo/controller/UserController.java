@@ -7,6 +7,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import jakarta.validation.Valid;
 
@@ -17,6 +21,7 @@ import com.example.demo.vo.UserVO;
 import com.example.demo.common.Result;
 import com.example.demo.common.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
@@ -55,5 +60,15 @@ public class UserController {
         Long userId = UserContext.getUserId();
         userService.deactivateAccount(userId);
         return Result.success("账号已注销", null);
+    }
+
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "更新用户状态", description = "管理员审批或改变用户的账号状态 (pending, approved, suspended)")
+    public Result<Void> updateUserStatus(
+            @Parameter(description = "用户ID") @PathVariable Long id,
+            @Parameter(description = "新状态") @RequestParam String status) {
+        userService.updateUserStatus(id, status);
+        return Result.success("用户状态更新成功", null);
     }
 }

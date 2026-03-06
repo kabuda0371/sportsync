@@ -3,6 +3,7 @@ package com.example.demo.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.demo.dto.BookingRequestDTO;
+import com.example.demo.dto.BookingStatusUpdateDTO;
 import com.example.demo.entity.Booking;
 import com.example.demo.entity.Facility;
 import com.example.demo.exception.BusinessException;
@@ -15,6 +16,7 @@ import com.example.demo.entity.User;
 import com.example.demo.enums.AccountStatusEnum;
 import com.example.demo.enums.BookingStatusEnum;
 import com.example.demo.enums.UserRoleEnum;
+import com.example.demo.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,9 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -75,6 +80,7 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                 .startTime(requestDTO.getStartTime())
                 .endTime(requestDTO.getEndTime())
                 .status(BookingStatusEnum.PENDING.getValue())
+                .activityDescription(requestDTO.getActivityDescription())
                 .build();
 
         this.save(booking);
@@ -134,6 +140,22 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         queryWrapper.eq(Booking::getStatus, BookingStatusEnum.PENDING.getValue())
                 .orderByAsc(Booking::getBookingDate, Booking::getStartTime);
 
+        // 如果是 STAFF，只显示分配给该员工的设施的预订
+        if (UserRoleEnum.STAFF.getValue().equals(user.getRole())) {
+            List<Long> assignedFacilityIds = facilityService.lambdaQuery()
+                    .eq(Facility::getAssignedStaffId, staffId)
+                    .list()
+                    .stream()
+                    .map(Facility::getId)
+                    .collect(Collectors.toList());
+
+            if (assignedFacilityIds.isEmpty()) {
+                // Return empty list if staff has no assigned facilities
+                return List.of();
+            }
+            queryWrapper.in(Booking::getFacilityId, assignedFacilityIds);
+        }
+
         return this.list(queryWrapper).stream()
                 .map(this::convertToVO)
                 .collect(Collectors.toList());
@@ -141,7 +163,7 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateBookingStatus(Long staffId, Long bookingId, String status) {
+    public void updateBookingStatus(Long staffId, Long bookingId, BookingStatusUpdateDTO reviewDTO) {
         // Validate staff role
         User user = userService.getById(staffId);
         if (user == null || (!UserRoleEnum.STAFF.getValue().equals(user.getRole()) && !UserRoleEnum.ADMIN.getValue().equals(user.getRole()))) {
@@ -149,9 +171,9 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         }
 
         // 前端可能传大写，统一转小写再校验
-        String normalizedStatus = status.toLowerCase();
+        String normalizedStatus = reviewDTO.getStatus().toLowerCase();
         if (!BookingStatusEnum.APPROVED.getValue().equals(normalizedStatus) && !BookingStatusEnum.REJECTED.getValue().equals(normalizedStatus)) {
-            throw new BusinessException(400, "无效的审批状态");
+            throw new BusinessException(400, "无效的审批状态，只能为 approved 或 rejected");
         }
 
         Booking booking = this.getById(bookingId);
@@ -159,12 +181,42 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
             throw new BusinessException(404, "预订记录不存在");
         }
 
+        // 校验员工是否有权限审批该设施
+        if (UserRoleEnum.STAFF.getValue().equals(user.getRole())) {
+            Facility facility = facilityService.getById(booking.getFacilityId());
+            if (facility == null || !staffId.equals(facility.getAssignedStaffId())) {
+                throw new BusinessException(403, "没有权限审批该设施的预订");
+            }
+        }
+
         if (!BookingStatusEnum.PENDING.getValue().equals(booking.getStatus())) {
             throw new BusinessException(400, "只能审批待处理的预订");
         }
 
+        // 如果提供了替代设施，验证该设施存在
+        if (reviewDTO.getSuggestedFacilityId() != null) {
+            Facility suggested = facilityService.getById(reviewDTO.getSuggestedFacilityId());
+            if (suggested == null) {
+                throw new BusinessException(404, "建议的替代设施不存在");
+            }
+        }
+
         booking.setStatus(normalizedStatus);
+        booking.setStaffNote(reviewDTO.getStaffNote());
+        booking.setSuggestedFacilityId(reviewDTO.getSuggestedFacilityId());
         this.updateById(booking);
+
+        // 审批完成后，自动向会员发送站内通知
+        String message;
+        if (BookingStatusEnum.APPROVED.getValue().equals(normalizedStatus)) {
+            message = "您的预订申请（ID：" + bookingId + "）已获批准！期待您的到来。";
+        } else {
+            String note = (reviewDTO.getStaffNote() != null && !reviewDTO.getStaffNote().isBlank())
+                    ? "备注：" + reviewDTO.getStaffNote()
+                    : "请联系体育中心了解详情。";
+            message = "您的预订申请（ID：" + bookingId + "）已被拒绝。" + note;
+        }
+        notificationService.sendNotification(booking.getUserId(), bookingId, message);
     }
 
     @Override
@@ -189,6 +241,42 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         this.updateById(booking);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void markBookingCompleted(Long staffId, Long bookingId) {
+        // 校验工作人员身份
+        User staff = userService.getById(staffId);
+        if (staff == null || (!UserRoleEnum.STAFF.getValue().equals(staff.getRole())
+                && !UserRoleEnum.ADMIN.getValue().equals(staff.getRole()))) {
+            throw new BusinessException(403, "没有权限执行此操作");
+        }
+
+        Booking booking = this.getById(bookingId);
+        if (booking == null) {
+            throw new BusinessException(404, "预订记录不存在");
+        }
+
+        // 校验员工是否有权限管理该设施
+        if (UserRoleEnum.STAFF.getValue().equals(staff.getRole())) {
+            Facility facility = facilityService.getById(booking.getFacilityId());
+            if (facility == null || !staffId.equals(facility.getAssignedStaffId())) {
+                throw new BusinessException(403, "没有权限标记该设施的预订为完成");
+            }
+        }
+
+        // 只有已批准的预订才能标记为已完成
+        if (!BookingStatusEnum.APPROVED.getValue().equals(booking.getStatus())) {
+            throw new BusinessException(400, "只有已批准的预订才能标记为已完成");
+        }
+
+        booking.setStatus(BookingStatusEnum.COMPLETED.getValue());
+        this.updateById(booking);
+
+        // 自动向会员发送完成通知
+        String message = "您的场次预订（ID：" + bookingId + "）已由工作人员确认完成，感谢您使用体育中心设施！";
+        notificationService.sendNotification(booking.getUserId(), bookingId, message);
+    }
+
     private BookingVO convertToVO(Booking booking) {
         return BookingVO.builder()
                 .id(booking.getId())
@@ -198,6 +286,9 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                 .startTime(booking.getStartTime())
                 .endTime(booking.getEndTime())
                 .status(booking.getStatus())
+                .activityDescription(booking.getActivityDescription())
+                .staffNote(booking.getStaffNote())
+                .suggestedFacilityId(booking.getSuggestedFacilityId())
                 .createdAt(booking.getCreatedAt())
                 .build();
     }

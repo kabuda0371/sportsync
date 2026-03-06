@@ -149,4 +149,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         this.updateById(user);
         log.info("用户已注销账号，ID: {}", userId);
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUserStatus(Long userId, String status) {
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException(404, "用户不存在");
+        }
+        
+        // 校验状态值是否合法
+        boolean validStatus = false;
+        for (AccountStatusEnum enumStatus : AccountStatusEnum.values()) {
+            if (enumStatus.getValue().equals(status)) {
+                validStatus = true;
+                break;
+            }
+        }
+        
+        if (!validStatus) {
+            throw new BusinessException(400, "无效的用户状态");
+        }
+        
+        user.setAccountStatus(status);
+        this.updateById(user);
+        log.info("管理员更新了用户状态，ID: {}, 新状态: {}", userId, status);
+    }
 }

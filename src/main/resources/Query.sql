@@ -113,26 +113,42 @@ CREATE TABLE facilities (
 
 
 
--- 设施场地预订记录表
 CREATE TABLE bookings (
     -- 预订记录ID
-    booking_id INT AUTO_INCREMENT PRIMARY KEY,
+                          booking_id INT AUTO_INCREMENT PRIMARY KEY,
+
     -- 发起预订的用户ID
-    user_id INT NOT NULL,
+                          user_id INT NOT NULL,
+
     -- 被预订的设施ID
-    facility_id INT NOT NULL,
+                          facility_id INT NOT NULL,
+
     -- 预订日期
-    booking_date DATE NOT NULL,
+                          booking_date DATE NOT NULL,
+
     -- 预订开始时间
-    start_time TIME NOT NULL,
+                          start_time TIME NOT NULL,
+
     -- 预订结束时间
-    end_time TIME NOT NULL,
-    -- 预订状态(待审批、已批准、已拒绝、已取消)
-    status VARCHAR(20) DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+                          end_time TIME NOT NULL,
+
+    -- 预订状态(待审批、已批准、已拒绝、已取消、已完成)
+                          status VARCHAR(20) DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled', 'completed')),
+
+    -- 会员预期活动描述
+                          activity_description TEXT NULL COMMENT '会员预期活动描述',
+
+    -- 工作人员审批备注
+                          staff_note TEXT NULL COMMENT '工作人员审批备注',
+
+    -- 建议替代设施ID
+                          suggested_facility_id INT NULL COMMENT '建议替代设施ID',
+
     -- 记录创建时间
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     -- 记录更新时间
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- 插入一些默认的体育设施数据
@@ -157,3 +173,20 @@ drop table bookings;
 show tables;
 show create table users;
 select * from users;
+
+-- 站内通知表：当工作人员审批或完成预订时，自动写入并由会员主动读取
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    -- 接收通知的用户ID
+    user_id         INT          NOT NULL,
+    -- 关联的预订ID
+    booking_id      INT          NOT NULL,
+    -- 通知正文
+    message         VARCHAR(500) NOT NULL,
+    -- 是否已读，0=未读 1=已读
+    is_read         TINYINT(1)   NOT NULL DEFAULT 0,
+    -- 通知创建时间
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id)    REFERENCES users(user_id)    ON DELETE CASCADE,
+    FOREIGN KEY (booking_id) REFERENCES bookings(booking_id) ON DELETE CASCADE
+);

@@ -36,6 +36,12 @@ public class Booking {
 
     private String status;
 
+    private String activityDescription;
+
+    private String staffNote;
+
+    private Long suggestedFacilityId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

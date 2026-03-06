@@ -10,7 +10,8 @@ public enum BookingStatusEnum {
     PENDING("pending", "待审批"),
     APPROVED("approved", "已批准"),
     REJECTED("rejected", "已拒绝"),
-    CANCELLED("cancelled", "已取消");
+    CANCELLED("cancelled", "已取消"),
+    COMPLETED("completed", "已完成");
 
     private final String value;
     private final String desc;

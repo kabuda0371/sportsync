@@ -76,12 +76,12 @@ public class BookingController {
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-    @Operation(summary = "审批预订", description = "批准或拒绝预订申请，仅限员工或管理员")
+    @Operation(summary = "审批预订", description = "批准、拒绝预订申请，拒绝时可附加工作人员备注和建议的替代设施ID，仅限员工或管理员")
     public Result<Void> updateBookingStatus(
             @Parameter(description = "预订ID") @PathVariable Long id,
             @Valid @RequestBody BookingStatusUpdateDTO statusDTO) {
         Long staffId = UserContext.getUserId();
-        bookingService.updateBookingStatus(staffId, id, statusDTO.getStatus());
+        bookingService.updateBookingStatus(staffId, id, statusDTO);
         return Result.success(null);
     }
     @DeleteMapping("/{id}")
@@ -95,5 +95,16 @@ public class BookingController {
         bookingService.cancelBooking(userId, id);
         return Result.success(null);
     }
+
+    @PutMapping("/{id}/complete")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @Operation(summary = "标记场次完成", description = "工作人员确认场次已完成，预订状态更新为 completed 并自动通知会员，仅限员工或管理员")
+    public Result<Void> completeBooking(
+            @Parameter(description = "预订ID") @PathVariable Long id) {
+        Long staffId = UserContext.getUserId();
+        bookingService.markBookingCompleted(staffId, id);
+        return Result.success(null);
+    }
 }
+
 
