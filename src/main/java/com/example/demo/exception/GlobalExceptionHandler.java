@@ -29,7 +29,7 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
         
-        return Result.error(400, "参数校验失败", errors);
+        return Result.error(400, "Parameter validation failed", errors);
     }
 
     /**
@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public Result<?> handleException(Exception ex) {
         ex.printStackTrace(); // 真实项目中推荐使用日志记录：log.error("System Error", ex)
-        return Result.error(500, "系统内部错误，请联系管理员");
+        return Result.error(500, "Internal system error, please contact administrator");
     }
 
     @ExceptionHandler(BusinessException.class)
@@ -61,6 +61,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
-        return Result.error(400, "参数格式错误，请检查输入数据的格式");
+        return Result.error(400, "Parameter format error, please check the input data format");
     }
 }

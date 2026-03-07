@@ -12,24 +12,24 @@ import java.time.LocalTime;
 public class BookingRequestDTO {
 
     @Schema(description = "设施ID", example = "1")
-    @NotNull(message = "设施ID不能为空")
+    @NotNull(message = "Facility ID cannot be empty")
     private Long facilityId;
 
     @Schema(description = "预订日期", example = "2024-03-10")
-    @NotNull(message = "预订日期不能为空")
-    @FutureOrPresent(message = "预订日期必须是今天或以后的日期")
+    @NotNull(message = "Booking date cannot be empty")
+    @FutureOrPresent(message = "Booking date must be today or in the future")
     private LocalDate bookingDate;
 
     @Schema(description = "开始时间", example = "10:00:00")
-    @NotNull(message = "开始时间不能为空")
+    @NotNull(message = "Start time cannot be empty")
     private LocalTime startTime;
 
     @Schema(description = "结束时间", example = "11:00:00")
-    @NotNull(message = "结束时间不能为空")
+    @NotNull(message = "End time cannot be empty")
     private LocalTime endTime;
 
     @Schema(description = "活动描述（可选），说明预期活动内容", example = "羽毛球双打比赛")
-    @Size(max = 500, message = "活动描述不能超过500个字符")
-    @NotNull(message = "活动描述不能为空")
+    @Size(max = 500, message = "Activity description cannot exceed 500 characters")
+    @NotNull(message = "Activity description cannot be empty")
     private String activityDescription;
 }

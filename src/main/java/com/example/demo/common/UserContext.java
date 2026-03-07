@@ -19,7 +19,7 @@ public class UserContext {
     public static Long getUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
-            throw new BusinessException(401, "用户未登录");
+            throw new BusinessException(401, "User not logged in");
         }
         
         // 我们的 JwtAuthenticationFilter 会将 userId 原封不动地存为 principal
@@ -29,7 +29,7 @@ public class UserContext {
             try {
                 return Long.parseLong((String) principal);
             } catch (NumberFormatException e) {
-                throw new BusinessException("用户信息解析异常");
+                throw new BusinessException("Failed to parse user information");
             }
         } else if (principal instanceof Long) {
             return (Long) principal;
@@ -38,7 +38,7 @@ public class UserContext {
             return Long.parseLong(((UserDetails) principal).getUsername());
         }
         
-        throw new BusinessException("无法识别的用户身份");
+        throw new BusinessException("Unrecognized user identity");
     }
 
     // 废弃清除, Spring Security 的 SecurityContextPersistenceFilter 自动会在处理完成后清理 Context

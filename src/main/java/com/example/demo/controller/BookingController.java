@@ -35,7 +35,7 @@ public class BookingController {
     public Result<BookingVO> createBooking(@Valid @RequestBody BookingRequestDTO requestDTO) {
         Long userId = UserContext.getUserId();
         if (userId == null) {
-            throw new BusinessException(401, "用户未登录");
+            throw new BusinessException(401, "User not logged in");
         }
         return Result.success(bookingService.createBooking(userId, requestDTO));
     }
@@ -45,7 +45,7 @@ public class BookingController {
     public Result<List<BookingVO>> getMyBookings() {
         Long userId = UserContext.getUserId();
         if (userId == null) {
-            throw new BusinessException(401, "用户未登录");
+            throw new BusinessException(401, "User not logged in");
         }
         return Result.success(bookingService.getUserBookings(userId));
     }
@@ -55,7 +55,7 @@ public class BookingController {
     public Result<List<BookingVO>> getUpcomingBookings() {
         Long userId = UserContext.getUserId();
         if (userId == null) {
-            throw new BusinessException(401, "用户未登录");
+            throw new BusinessException(401, "User not logged in");
         }
         return Result.success(bookingService.getUpcomingBookings(userId));
     }
@@ -90,7 +90,7 @@ public class BookingController {
             @Parameter(description = "预订ID") @PathVariable Long id) {
         Long userId = UserContext.getUserId();
         if (userId == null) {
-            throw new BusinessException(401, "用户未登录");
+            throw new BusinessException(401, "User not logged in");
         }
         bookingService.cancelBooking(userId, id);
         return Result.success(null);

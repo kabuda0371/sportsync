@@ -31,7 +31,7 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
     public FacilityVO getFacilityById(Long id) {
         Facility facility = this.getById(id);
         if (facility == null) {
-            throw new BusinessException(404, "没有此设备");
+            throw new BusinessException(404, "Facility not found");
         }
         return convertToVO(facility);
     }
@@ -54,7 +54,7 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
     public void updateFacility(Long id, FacilityDTO dto) {
         Facility existingFacility = this.getById(id);
         if (existingFacility == null) {
-            throw new BusinessException(404, "没有此设备");
+            throw new BusinessException(404, "Facility not found");
         }
         existingFacility.setName(dto.getName());
         existingFacility.setType(dto.getType());
@@ -71,7 +71,7 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
     public void deleteFacility(Long id) {
         Facility existingFacility = this.getById(id);
         if (existingFacility == null) {
-            throw new BusinessException(404, "没有此设备");
+            throw new BusinessException(404, "Facility not found");
         }
         this.removeById(id);
     }
@@ -80,16 +80,16 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
     public void assignStaff(Long facilityId, Long staffId) {
         Facility facility = this.getById(facilityId);
         if (facility == null) {
-            throw new BusinessException(404, "没有此设备");
+            throw new BusinessException(404, "Facility not found");
         }
         
         User staff = userService.getById(staffId);
         if (staff == null) {
-            throw new BusinessException(404, "没有此用户");
+            throw new BusinessException(404, "User not found");
         }
         
         if (!UserRoleEnum.STAFF.getValue().equals(staff.getRole())) {
-            throw new BusinessException(400, "该用户不是员工，无法分配");
+            throw new BusinessException(400, "The user is not a staff member and cannot be assigned");
         }
         
         facility.setAssignedStaffId(staffId);

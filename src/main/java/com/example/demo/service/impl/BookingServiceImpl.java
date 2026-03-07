@@ -43,18 +43,18 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         // Validate facility exists
         Facility facility = facilityService.getById(requestDTO.getFacilityId());
         if (facility == null) {
-            throw new BusinessException(404, "设施不存在");
+            throw new BusinessException(404, "Facility not found");
         }
 
         // Validate user account status
         User user = userService.getById(userId);
         if (user == null || !AccountStatusEnum.APPROVED.getValue().equalsIgnoreCase(user.getAccountStatus())) {
-            throw new BusinessException(403, "账号未获得批准，无法预定设施");
+            throw new BusinessException(403, "Account not approved, unable to book facilities");
         }
 
         // Validate time
         if (requestDTO.getStartTime().isAfter(requestDTO.getEndTime())) {
-            throw new BusinessException(400, "开始时间必须早于结束时间");
+            throw new BusinessException(400, "Start time must be earlier than end time");
         }
 
         // Check for conflicts
@@ -69,7 +69,7 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
 
         long conflictCount = this.count(queryWrapper);
         if (conflictCount > 0) {
-            throw new BusinessException(409, "时间段已被占用");
+            throw new BusinessException(409, "Time slot is already occupied");
         }
 
         // Create booking
@@ -133,7 +133,7 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         // Validate staff role
         User user = userService.getById(staffId);
         if (user == null || (!UserRoleEnum.STAFF.getValue().equals(user.getRole()) && !UserRoleEnum.ADMIN.getValue().equals(user.getRole()))) {
-            throw new BusinessException(403, "没有权限查看待审批预订");
+            throw new BusinessException(403, "No permission to view pending bookings");
         }
 
         LambdaQueryWrapper<Booking> queryWrapper = new LambdaQueryWrapper<>();
@@ -167,37 +167,37 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         // Validate staff role
         User user = userService.getById(staffId);
         if (user == null || (!UserRoleEnum.STAFF.getValue().equals(user.getRole()) && !UserRoleEnum.ADMIN.getValue().equals(user.getRole()))) {
-            throw new BusinessException(403, "没有权限审批预订");
+            throw new BusinessException(403, "No permission to approve bookings");
         }
 
         // 前端可能传大写，统一转小写再校验
         String normalizedStatus = reviewDTO.getStatus().toLowerCase();
         if (!BookingStatusEnum.APPROVED.getValue().equals(normalizedStatus) && !BookingStatusEnum.REJECTED.getValue().equals(normalizedStatus)) {
-            throw new BusinessException(400, "无效的审批状态，只能为 approved 或 rejected");
+            throw new BusinessException(400, "Invalid approval status, must be approved or rejected");
         }
 
         Booking booking = this.getById(bookingId);
         if (booking == null) {
-            throw new BusinessException(404, "预订记录不存在");
+            throw new BusinessException(404, "Booking record not found");
         }
 
         // 校验员工是否有权限审批该设施
         if (UserRoleEnum.STAFF.getValue().equals(user.getRole())) {
             Facility facility = facilityService.getById(booking.getFacilityId());
             if (facility == null || !staffId.equals(facility.getAssignedStaffId())) {
-                throw new BusinessException(403, "没有权限审批该设施的预订");
+                throw new BusinessException(403, "No permission to approve bookings for this facility");
             }
         }
 
         if (!BookingStatusEnum.PENDING.getValue().equals(booking.getStatus())) {
-            throw new BusinessException(400, "只能审批待处理的预订");
+            throw new BusinessException(400, "Can only approve pending bookings");
         }
 
         // 如果提供了替代设施，验证该设施存在
         if (reviewDTO.getSuggestedFacilityId() != null) {
             Facility suggested = facilityService.getById(reviewDTO.getSuggestedFacilityId());
             if (suggested == null) {
-                throw new BusinessException(404, "建议的替代设施不存在");
+                throw new BusinessException(404, "Suggested alternative facility not found");
             }
         }
 
@@ -209,12 +209,12 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         // 审批完成后，自动向会员发送站内通知
         String message;
         if (BookingStatusEnum.APPROVED.getValue().equals(normalizedStatus)) {
-            message = "您的预订申请（ID：" + bookingId + "）已获批准！期待您的到来。";
+            message = "Your booking request (ID: " + bookingId + ") has been approved! Looking forward to your visit.";
         } else {
             String note = (reviewDTO.getStaffNote() != null && !reviewDTO.getStaffNote().isBlank())
                     ? "备注：" + reviewDTO.getStaffNote()
                     : "请联系体育中心了解详情。";
-            message = "您的预订申请（ID：" + bookingId + "）已被拒绝。" + note;
+            message = "Your booking request (ID: " + bookingId + ") has been rejected. " + note;
         }
         notificationService.sendNotification(booking.getUserId(), bookingId, message);
     }
@@ -224,17 +224,17 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
     public void cancelBooking(Long userId, Long bookingId) {
         Booking booking = this.getById(bookingId);
         if (booking == null) {
-            throw new BusinessException(404, "预订记录不存在");
+            throw new BusinessException(404, "Booking record not found");
         }
 
         // 只能取消自己的预订
         if (!booking.getUserId().equals(userId)) {
-            throw new BusinessException(403, "无权取消他人的预订");
+            throw new BusinessException(403, "No permission to cancel others' bookings");
         }
 
         // 只能取消待处理的预订
         if (!BookingStatusEnum.PENDING.getValue().equals(booking.getStatus())) {
-            throw new BusinessException(400, "只能取消待处理的预订");
+            throw new BusinessException(400, "Can only cancel pending bookings");
         }
 
         booking.setStatus(BookingStatusEnum.CANCELLED.getValue());
@@ -248,32 +248,32 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         User staff = userService.getById(staffId);
         if (staff == null || (!UserRoleEnum.STAFF.getValue().equals(staff.getRole())
                 && !UserRoleEnum.ADMIN.getValue().equals(staff.getRole()))) {
-            throw new BusinessException(403, "没有权限执行此操作");
+            throw new BusinessException(403, "No permission to perform this action");
         }
 
         Booking booking = this.getById(bookingId);
         if (booking == null) {
-            throw new BusinessException(404, "预订记录不存在");
+            throw new BusinessException(404, "Booking record not found");
         }
 
         // 校验员工是否有权限管理该设施
         if (UserRoleEnum.STAFF.getValue().equals(staff.getRole())) {
             Facility facility = facilityService.getById(booking.getFacilityId());
             if (facility == null || !staffId.equals(facility.getAssignedStaffId())) {
-                throw new BusinessException(403, "没有权限标记该设施的预订为完成");
+                throw new BusinessException(403, "No permission to mark bookings for this facility as completed");
             }
         }
 
         // 只有已批准的预订才能标记为已完成
         if (!BookingStatusEnum.APPROVED.getValue().equals(booking.getStatus())) {
-            throw new BusinessException(400, "只有已批准的预订才能标记为已完成");
+            throw new BusinessException(400, "Only approved bookings can be marked as completed");
         }
 
         booking.setStatus(BookingStatusEnum.COMPLETED.getValue());
         this.updateById(booking);
 
         // 自动向会员发送完成通知
-        String message = "您的场次预订（ID：" + bookingId + "）已由工作人员确认完成，感谢您使用体育中心设施！";
+        String message = "Your facility booking (ID: " + bookingId + ") has been confirmed completed by staff. Thank you for using the sports center facilities!";
         notificationService.sendNotification(booking.getUserId(), bookingId, message);
     }
 

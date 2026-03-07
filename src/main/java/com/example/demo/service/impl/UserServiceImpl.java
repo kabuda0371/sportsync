@@ -65,7 +65,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             this.save(user);
         } catch (DuplicateKeyException e) {
             log.error("高并发注册冲突，邮箱已被注册: {}", registerDTO.getEmail(), e);
-            throw new BusinessException("该邮箱已被注册！");
+            throw new BusinessException("Email is already registered!");
         }
 
         log.info("用户注册成功，ID: {}", user.getId());
@@ -93,29 +93,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             // 防止计时攻击 (Timing Attack)：即使账号不存在，也进行一次耗时的哈希计算，抹平响应时间差异
             passwordEncoder.encode(loginDTO.getPassword());
             loginRateLimiter.recordFailedAttempt(email); // 不要放过爆破不存在邮箱的恶意流量
-            throw new BusinessException("邮箱或密码错误！"); // 模糊提示
+            throw new BusinessException("Invalid email or password!"); // 模糊提示
         }
 
         // 3. 校验账号状态 (明确区分各类异常状态)
         String accountStatus = user.getAccountStatus();
         if (AccountStatusEnum.SUSPENDED.getValue().equals(accountStatus)) {
             log.warn("登录拦截，账号已被封禁: {}", email);
-            throw new BusinessException("您的账号已被封禁，如有疑问请联系客服！");
+            throw new BusinessException("Your account has been banned. Please contact customer service!");
         }
         if (AccountStatusEnum.PENDING.getValue().equals(accountStatus)) {
             log.warn("登录拦截，账号审核中: {}", email);
-            throw new BusinessException("您的账号还在审核中，请耐心等待！"); 
+            throw new BusinessException("Your account is still under review, please be patient!"); 
         }
         if (!AccountStatusEnum.APPROVED.getValue().equals(accountStatus)) {
             log.warn("登录失败，未知的账号状态异常: {}，当前状态: {}", email, accountStatus);
-            throw new BusinessException("账号状态异常，无法登录！"); 
+            throw new BusinessException("Abnormal account status, unable to login!"); 
         }
 
         // 4. 断开与数据库的关联依赖（当前类 login() 没有 @Transactional 注解，由于 MyBatis 的 session 机制，在 lambdaQuery 执行完后，底层 Connection 会被及时释放回连接池，只有在有 @Transactional 长事务包裹时，连接才会被一直挂起）
         // 这里进行耗时的 CPU 密集型计算（Bcrypt）是安全的，不会阻塞连接池
         if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPasswordHash())) {
             loginRateLimiter.recordFailedAttempt(email);
-            throw new BusinessException("邮箱或密码错误！");
+            throw new BusinessException("Invalid email or password!");
         }
 
         log.info("用户登录成功，ID: {}, 邮箱: {}", user.getId(), email);
@@ -133,7 +133,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public UserVO getUserInfo(Long userId) {
         User user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException("用户不存在！");
+            throw new BusinessException("User not found!");
         }
         return userConverter.toVO(user);
     }
@@ -143,7 +143,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public void deactivateAccount(Long userId) {
         User user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException(404, "用户不存在");
+            throw new BusinessException(404, "User not found");
         }
         user.setAccountStatus(AccountStatusEnum.SUSPENDED.getValue());
         this.updateById(user);
@@ -155,7 +155,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public void updateUserStatus(Long userId, String status) {
         User user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException(404, "用户不存在");
+            throw new BusinessException(404, "User not found");
         }
         
         // 校验状态值是否合法
@@ -168,7 +168,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
         
         if (!validStatus) {
-            throw new BusinessException(400, "无效的用户状态");
+            throw new BusinessException(400, "Invalid user status");
         }
         
         user.setAccountStatus(status);

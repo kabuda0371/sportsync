@@ -45,10 +45,10 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
     public void markAsRead(Long userId, Long notificationId) {
         Notification notification = this.getById(notificationId);
         if (notification == null) {
-            throw new BusinessException(404, "通知不存在");
+            throw new BusinessException(404, "Notification not found");
         }
         if (!notification.getUserId().equals(userId)) {
-            throw new BusinessException(403, "无权操作他人的通知");
+            throw new BusinessException(403, "Unauthorized to operate on others' notifications");
         }
         notification.setIsRead(true);
         this.updateById(notification);

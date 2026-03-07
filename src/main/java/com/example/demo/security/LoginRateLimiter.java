@@ -36,7 +36,7 @@ public class LoginRateLimiter {
         
         if (expire != null && expire > 0) {
             log.warn("防爆破拦截：源自邮箱 {} 的高频异常调用，账号已被锁定，剩余解锁时间约 {} 分钟", email, expire);
-            throw new BusinessException("密码错误次数过多，账号已锁定，请 " + expire + " 分钟后再试！");
+            throw new BusinessException("Too many incorrect password attempts, account locked. Please try again in " + expire + " minutes!");
         }
     }
 

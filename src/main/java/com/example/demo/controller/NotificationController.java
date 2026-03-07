@@ -26,7 +26,7 @@ public class NotificationController {
     public Result<List<NotificationVO>> getMyNotifications() {
         Long userId = UserContext.getUserId();
         if (userId == null) {
-            throw new BusinessException(401, "用户未登录");
+            throw new BusinessException(401, "User not logged in");
         }
         return Result.success(notificationService.getMyNotifications(userId));
     }
@@ -37,7 +37,7 @@ public class NotificationController {
             @Parameter(description = "通知ID") @PathVariable Long id) {
         Long userId = UserContext.getUserId();
         if (userId == null) {
-            throw new BusinessException(401, "用户未登录");
+            throw new BusinessException(401, "User not logged in");
         }
         notificationService.markAsRead(userId, id);
         return Result.success(null);
