@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.mapper.UserMapper">
+
+    <resultMap id="userResultMap" type="com.example.demo.entity.User" autoMapping="true">
+        <id column="user_id" property="id"/>
+    </resultMap>
+
+    <select id="selectMatchedPartners" resultMap="userResultMap">
+        SELECT *
+        FROM users
+        WHERE is_partner_matching_enabled = 1
+          AND account_status = 'approved'
+          AND user_id NOT IN
+            <foreach collection="excludeIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+          AND (
+            <foreach collection="searchSports" item="sport" separator=" OR ">
+                FIND_IN_SET(#{sport}, preferred_sport) &gt; 0
+            </foreach>
+          )
+          <if test="skillLevel != null">
+            AND skill_level = #{skillLevel}
+          </if>
+          <if test="availability != null">
+            AND FIND_IN_SET(#{availability}, availability) &gt; 0
+          </if>
+        ORDER BY
+          CASE WHEN skill_level = #{currentSkillLevel} THEN 0 ELSE 1 END,
+          CASE
+            <foreach collection="currentAvailabilities" item="avail">
+              WHEN FIND_IN_SET(#{avail}, availability) &gt; 0 THEN 0
+            </foreach>
+            ELSE 1
+          END
+    </select>
+
+</mapper>
