@@ -14,8 +14,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 
 import jakarta.validation.Valid;
 
+import com.example.demo.dto.GoogleLoginDTO;
+import com.example.demo.dto.ProfileUpdateDTO;
+import com.example.demo.dto.ResendVerificationDTO;
 import com.example.demo.dto.UserRegisterDTO;
 import com.example.demo.dto.UserLoginDTO;
+import com.example.demo.dto.VerifyEmailDTO;
 import com.example.demo.service.UserService;
 import com.example.demo.vo.UserVO;
 import com.example.demo.common.Result;
@@ -33,10 +37,24 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping("/register")
-    @Operation(summary = "用户注册", description = "根据邮箱、密码、姓名进行新用户注册")
+    @Operation(summary = "用户注册", description = "根据邮箱、密码、姓名进行新用户注册，注册后需要验证邮箱")
     public Result<UserVO> registerUser(@Valid @RequestBody UserRegisterDTO registerDTO) {
         UserVO userVO = userService.register(registerDTO);
-        return Result.success("用户注册成功", userVO);
+        return Result.success("注册成功，验证码已发送至您的邮箱，请查收", userVO);
+    }
+
+    @PostMapping("/verify-email")
+    @Operation(summary = "邮箱验证", description = "使用注册时发送的6位验证码完成邮箱验证")
+    public Result<Void> verifyEmail(@Valid @RequestBody VerifyEmailDTO verifyEmailDTO) {
+        userService.verifyEmail(verifyEmailDTO.getEmail(), verifyEmailDTO.getCode());
+        return Result.success("邮箱验证成功，您现在可以登录了", null);
+    }
+
+    @PostMapping("/resend-verification")
+    @Operation(summary = "重新发送验证码", description = "重新发送邮箱验证码，每次请求之间需要等待60秒")
+    public Result<Void> resendVerification(@Valid @RequestBody ResendVerificationDTO resendDTO) {
+        userService.resendVerificationCode(resendDTO.getEmail());
+        return Result.success("验证码已重新发送，请查收邮箱", null);
     }
 
     @PostMapping("/login")
@@ -46,12 +64,27 @@ public class UserController {
         return Result.success("登录成功", userVO);
     }
 
+    @PostMapping("/google-login")
+    @Operation(summary = "Google 第三方登录", description = "使用 Google ID Token 进行第三方登录，首次登录会自动注册")
+    public Result<UserVO> googleLogin(@Valid @RequestBody GoogleLoginDTO googleLoginDTO) {
+        UserVO userVO = userService.googleLogin(googleLoginDTO);
+        return Result.success("Google login successful", userVO);
+    }
+
     @GetMapping("/me")
     @Operation(summary = "获取当前用户信息", description = "根据请求头中的 Token 获取当前登录用户信息")
     public Result<UserVO> getCurrentUser() {
         Long userId = UserContext.getUserId();
         UserVO userVO = userService.getUserInfo(userId);
         return Result.success("获取用户信息成功", userVO);
+    }
+
+    @PutMapping("/me")
+    @Operation(summary = "补全用户资料", description = "更新当前用户的生日和地址信息")
+    public Result<UserVO> updateProfile(@Valid @RequestBody ProfileUpdateDTO profileUpdateDTO) {
+        Long userId = UserContext.getUserId();
+        UserVO userVO = userService.updateProfile(userId, profileUpdateDTO);
+        return Result.success("资料更新成功", userVO);
     }
 
     @DeleteMapping("/me")

@@ -1,192 +1,112 @@
-show databases;
-create database sports_centre_db;
-use sports_centre_db;
+CREATE DATABASE IF NOT EXISTS sports_centre_db;
+USE sports_centre_db;
+
+-- 用户表
 CREATE TABLE users (
-    -- 1. 基础身份与认证字段
-                       user_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
 
     -- 角色区分：会员、员工、管理员
-                       role VARCHAR(20) DEFAULT 'member' NOT NULL
-                           CHECK (role IN ('member', 'staff', 'admin')),
+    role VARCHAR(20) DEFAULT 'member' NOT NULL
+        CHECK (role IN ('member', 'staff', 'admin')),
 
     -- 登录邮箱，必须唯一
-                       email VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
 
-    -- 密码哈希值。因为高级需求要求支持 Google/Facebook 登录，第三方登录时没有本地密码，所以允许为 NULL
-                       password_hash VARCHAR(255),
+    -- 密码哈希值，第三方登录时允许为 NULL
+    password_hash VARCHAR(255),
 
-    -- 2. 个人基本信息 (注册要求)
-                       name VARCHAR(100) NOT NULL,
-
-    -- 出生日期和地址：作业要求会员注册时提供，但员工/管理员可能不需要，所以数据库层面可以允许为 NULL，由后端代码控制会员必填
-                       date_of_birth DATE,
-                       address TEXT,
-
-    -- 3. 员工/账号管理字段
-    -- 满足管理员可以“批准或暂停员工账户”的需求
-                       account_status VARCHAR(20) DEFAULT 'approved' NOT NULL
-                           CHECK (account_status IN ('pending', 'approved', 'suspended')),
-
-    -- 4. “运动搭子”档案字段 (仅限会员，且为选填)
-    -- 会员可以选择加入(opt in)搭子匹配功能
-                       is_partner_matching_enabled BOOLEAN DEFAULT FALSE,
-                       preferred_sport VARCHAR(100), -- 偏好运动，如 'badminton'
-                       skill_level VARCHAR(50),      -- 技能水平
-                       availability VARCHAR(255),    -- 空闲时间描述
-
-    -- 5. 高级需求：第三方登录 (Social Login)
-                       auth_provider VARCHAR(50) DEFAULT 'local' NOT NULL
-                           CHECK (auth_provider IN ('local', 'google', 'facebook')),
-                       social_id VARCHAR(255) UNIQUE, -- 存储 Google/Facebook 返回的唯一用户 ID
-
-    -- 6. 时间戳
-                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE users (
-    -- 1. 基础身份与认证字段
-                       user_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    -- 角色区分：会员、员工、管理员
-                       role VARCHAR(20) DEFAULT 'member' NOT NULL
-                           CHECK (role IN ('member', 'staff', 'admin')),
-
-    -- 登录邮箱，必须唯一
-                       email VARCHAR(255) UNIQUE NOT NULL,
-
-    -- 密码哈希值。因为高级需求要求支持 Google/Facebook 登录，第三方登录时没有本地密码，所以允许为 NULL
-                       password_hash VARCHAR(255),
-
-    -- 2. 个人基本信息 (注册要求)
-                       name VARCHAR(100) NOT NULL,
-
-    -- 出生日期和地址：作业要求会员注册时提供，但员工/管理员可能不需要，所以数据库层面可以允许为 NULL，由后端代码控制会员必填
-                       date_of_birth DATE,
-                       address TEXT,
-
-    -- 3. 员工/账号管理字段
-    -- 满足管理员可以“批准或暂停员工账户”的需求
-                       account_status VARCHAR(20) DEFAULT 'approved' NOT NULL
-                           CHECK (account_status IN ('pending', 'approved', 'suspended')),
-
-    -- 4. “运动搭子”档案字段 (仅限会员，且为选填)
-    -- 会员可以选择加入(opt in)搭子匹配功能
-                       is_partner_matching_enabled BOOLEAN DEFAULT FALSE,
-                       preferred_sport VARCHAR(100), -- 偏好运动，如 'badminton'
-                       skill_level VARCHAR(50),      -- 技能水平
-                       availability VARCHAR(255),    -- 空闲时间描述
-
-    -- 5. 高级需求：第三方登录 (Social Login)
-                       auth_provider VARCHAR(50) DEFAULT 'local' NOT NULL
-                           CHECK (auth_provider IN ('local', 'google', 'facebook')),
-                       social_id VARCHAR(255) UNIQUE, -- 存储 Google/Facebook 返回的唯一用户 ID
-
-    -- 6. 时间戳
-                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 体育设施信息表
-CREATE TABLE facilities (
-    -- 设施ID
-    facility_id INT AUTO_INCREMENT PRIMARY KEY,
-    -- 设施名称
+    -- 个人基本信息
     name VARCHAR(100) NOT NULL,
-    -- 设施类型(例如：badminton courts, football pitches)
-    type VARCHAR(50),
-    -- 设施描述
-    description TEXT,
-    -- 使用指南
-    usage_guidelines TEXT,
-    -- 容量限制(最大容纳人数)
-    capacity_limit INT,
-    -- 每次预订的时间段限制(分钟)
-    time_slot_limit_minutes INT,
-    -- 关联到负责该设施的员工ID
-    assigned_staff_id INT,
-    -- 记录创建时间
+    date_of_birth DATE,
+    address TEXT,
+
+    -- 账号状态
+    account_status VARCHAR(20) DEFAULT 'approved' NOT NULL
+        CHECK (account_status IN ('pending', 'approved', 'suspended')),
+
+    -- 伙伴匹配档案字段（仅限会员，选填）
+    is_partner_matching_enabled BOOLEAN DEFAULT FALSE,
+    preferred_sport VARCHAR(100) COMMENT '偏好运动，逗号分隔，如 badminton,tennis',
+    skill_level VARCHAR(50)
+        CHECK (skill_level IN ('beginner', 'intermediate', 'advanced')),
+    availability VARCHAR(255) COMMENT '可用时间，逗号分隔，如 weekday_evening,weekend_morning',
+    partner_bio VARCHAR(500) NULL COMMENT '伙伴匹配活动简介',
+
+    -- 第三方登录
+    auth_provider VARCHAR(50) DEFAULT 'local' NOT NULL
+        CHECK (auth_provider IN ('local', 'google', 'facebook')),
+    social_id VARCHAR(255) UNIQUE,
+
+    -- 时间戳
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    -- 记录更新时间
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 体育设施表
+CREATE TABLE facilities (
+    facility_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(50),
+    description TEXT,
+    usage_guidelines TEXT,
+    capacity_limit INT,
+    time_slot_limit_minutes INT,
+    assigned_staff_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-
-
+-- 预订表
 CREATE TABLE bookings (
-    -- 预订记录ID
                           booking_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    -- 发起预订的用户ID
                           user_id INT NOT NULL,
-
-    -- 被预订的设施ID
                           facility_id INT NOT NULL,
-
-    -- 预订日期
                           booking_date DATE NOT NULL,
-
-    -- 预订开始时间
                           start_time TIME NOT NULL,
-
-    -- 预订结束时间
                           end_time TIME NOT NULL,
-
-    -- 预订状态(待审批、已批准、已拒绝、已取消、已完成)
-                          status VARCHAR(20) DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled', 'completed')),
-
-    -- 会员预期活动描述
+                          status VARCHAR(20) DEFAULT 'pending' NOT NULL
+                              CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled', 'completed')),
                           activity_description TEXT NULL COMMENT '会员预期活动描述',
-
-    -- 工作人员审批备注
                           staff_note TEXT NULL COMMENT '工作人员审批备注',
-
-    -- 建议替代设施ID
                           suggested_facility_id INT NULL COMMENT '建议替代设施ID',
-
-    -- 记录创建时间
+                          partner_ids VARCHAR(255) NULL COMMENT '共享预订伙伴用户ID列表，逗号分隔',
                           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    -- 记录更新时间
                           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 插入一些默认的体育设施数据
-INSERT INTO facilities (name, type, description, usage_guidelines, capacity_limit, time_slot_limit_minutes, assigned_staff_id) VALUES
-('Court A', 'badminton', 'Standard indoor badminton court with wooden flooring.', 'Please wear non-marking shoes. Clean up after use.', 4, 60, NULL),
-('Court B', 'badminton', 'Standard indoor badminton court with synthetic flooring.', 'Please wear non-marking shoes. No food or drinks allowed on the court.', 4, 60, NULL),
-('Main Pitch', 'football', 'Outdoor 11-a-side football pitch with artificial turf.', 'Studded boots permitted. Please do not leave trash on the field.', 22, 120, NULL),
-('Swimming Pool 1', 'swimming', '50m Olympic size swimming pool.', 'Swimming cap required. Shower before entering the pool.', 50, 90, NULL),
-('Tennis Court 1', 'tennis', 'Outdoor hard court for tennis.', 'Only tennis shoes allowed. Rackets and balls not provided.', 4, 60, NULL);
-
--- 插入一些默认的预订测试数据 (假设我们已经有一个 user_id=1 的会员)
--- 注意：运行这段 SQL 之前请确保 users 表中已经存在 user_id=1 的记录，否则会有外键约束或者逻辑错误
-INSERT INTO bookings (user_id, facility_id, booking_date, start_time, end_time, status) VALUES
-(1, 1, CURRENT_DATE, '10:00:00', '11:00:00', 'approved'),
-(1, 1, CURRENT_DATE + INTERVAL 1 DAY, '14:00:00', '15:00:00', 'pending'),
-(1, 3, CURRENT_DATE + INTERVAL 2 DAY, '18:00:00', '20:00:00', 'approved');
-
-INSERT INTO users (role, email, password_hash, name, account_status, auth_provider)
-VALUES ('admin', 'admin@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Admin User', 'approved', 'local');
-
-drop table bookings;
-show tables;
-show create table users;
-select * from users;
-
--- 站内通知表：当工作人员审批或完成预订时，自动写入并由会员主动读取
-CREATE TABLE IF NOT EXISTS notifications (
-    notification_id BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    -- 接收通知的用户ID
-    user_id         INT          NOT NULL,
-    -- 关联的预订ID
-    booking_id      INT          NOT NULL,
-    -- 通知正文
-    message         VARCHAR(500) NOT NULL,
-    -- 是否已读，0=未读 1=已读
-    is_read         TINYINT(1)   NOT NULL DEFAULT 0,
-    -- 通知创建时间
-    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id)    REFERENCES users(user_id)    ON DELETE CASCADE,
+-- 站内通知表
+CREATE TABLE notifications (
+    notification_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    booking_id INT NOT NULL,
+    message VARCHAR(500) NOT NULL,
+    is_read TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (booking_id) REFERENCES bookings(booking_id) ON DELETE CASCADE
 );
+
+-- 伙伴配对请求表
+CREATE TABLE partner_requests (
+    request_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    requester_id INT NOT NULL,
+    target_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'accepted', 'rejected')),
+    message VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (requester_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (target_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uk_requester_target (requester_id, target_id)
+);
+
+SET FOREIGN_KEY_CHECKS = 0;
+drop table bookings;
+SET FOREIGN_KEY_CHECKS = 1;
+
+
+ALTER TABLE bookings ADD COLUMN partner_ids VARCHAR(255) NULL;
+UPDATE bookings SET partner_ids = CAST(partner_id AS CHAR) WHERE partner_id IS NOT NULL;
+ALTER TABLE bookings DROP FOREIGN KEY bookings_ibfk_N; -- 先删外键
+ALTER TABLE bookings DROP COLUMN partner_id;

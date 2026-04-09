@@ -42,6 +42,8 @@ public class Booking {
 
     private Long suggestedFacilityId;
 
+    private String partnerIds;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

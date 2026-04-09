@@ -45,7 +45,9 @@ public class User {
     private String skillLevel;
     
     private String availability;
-    
+
+    private String partnerBio;
+
     private String authProvider;
     
     private String socialId;

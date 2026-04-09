@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 public class BookingRequestDTO {
@@ -32,4 +33,7 @@ public class BookingRequestDTO {
     @Size(max = 500, message = "Activity description cannot exceed 500 characters")
     @NotNull(message = "Activity description cannot be empty")
     private String activityDescription;
+
+    @Schema(description = "共享预订伙伴用户ID列表（可选，需已接受的伙伴关系）", example = "[5, 8]")
+    private List<Long> partnerIds;
 }

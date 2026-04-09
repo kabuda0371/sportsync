@@ -1,6 +1,8 @@
 package com.example.demo.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.example.demo.dto.GoogleLoginDTO;
+import com.example.demo.dto.ProfileUpdateDTO;
 import com.example.demo.dto.UserRegisterDTO;
 import com.example.demo.entity.User;
 import com.example.demo.vo.UserVO;
@@ -39,4 +41,32 @@ public interface UserService extends IService<User> {
      * @param status 新的账号状态
      */
     void updateUserStatus(Long userId, String status);
+
+    /**
+     * Google 第三方登录
+     * @param googleLoginDTO 包含 Google ID Token
+     * @return 用户信息（含 JWT Token）
+     */
+    UserVO googleLogin(GoogleLoginDTO googleLoginDTO);
+
+    /**
+     * 更新用户资料（生日、地址）
+     * @param userId 用户 ID
+     * @param profileUpdateDTO 资料更新信息
+     * @return 更新后的用户信息
+     */
+    UserVO updateProfile(Long userId, ProfileUpdateDTO profileUpdateDTO);
+
+    /**
+     * 验证邮箱验证码
+     * @param email 用户邮箱
+     * @param code 6位验证码
+     */
+    void verifyEmail(String email, String code);
+
+    /**
+     * 重新发送邮箱验证码
+     * @param email 用户邮箱
+     */
+    void resendVerificationCode(String email);
 }

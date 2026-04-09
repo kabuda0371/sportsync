@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+
 import java.util.List;
 
 @RestController
@@ -26,6 +28,22 @@ public class FacilityController {
     @Operation(summary = "获取所有设施列表", description = "返回系统中所有可用的体育设施信息")
     public Result<List<FacilityVO>> getAllFacilities() {
         return Result.success(facilityService.getAllFacilities());
+    }
+
+    @GetMapping("/list")
+    @Operation(summary = "分页获取设施列表", description = "分页返回体育设施信息，支持按类型和容量筛选")
+    public Result<IPage<FacilityVO>> getFacilitiesPage(
+            @RequestParam(defaultValue = "1") @Parameter(description = "页码") int page,
+            @RequestParam(defaultValue = "10") @Parameter(description = "每页数量") int size,
+            @RequestParam(required = false) @Parameter(description = "设施类型") String type,
+            @RequestParam(required = false) @Parameter(description = "最小容纳人数") Integer minCapacity) {
+        return Result.success(facilityService.getFacilitiesPage(page, size, type, minCapacity));
+    }
+
+    @GetMapping("/types")
+    @Operation(summary = "获取所有设施类型", description = "返回去重后的所有设施类型列表")
+    public Result<List<String>> getFacilityTypes() {
+        return Result.success(facilityService.getAllTypes());
     }
 
     @GetMapping("/{id}")

@@ -7,7 +7,9 @@ import com.example.demo.dto.BookingStatusUpdateDTO;
 import com.example.demo.entity.Booking;
 import com.example.demo.entity.Facility;
 import com.example.demo.exception.BusinessException;
+import com.example.demo.entity.PartnerRequest;
 import com.example.demo.mapper.BookingMapper;
+import com.example.demo.mapper.PartnerRequestMapper;
 import com.example.demo.service.BookingService;
 import com.example.demo.service.FacilityService;
 import com.example.demo.service.UserService;
@@ -22,7 +24,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +41,43 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private PartnerRequestMapper partnerRequestMapper;
+
+    /**
+     * Parse comma-separated partner IDs string to List<Long>
+     */
+    private List<Long> parsePartnerIds(String partnerIds) {
+        if (partnerIds == null || partnerIds.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(partnerIds.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Long::valueOf)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Convert List<Long> to comma-separated string
+     */
+    private String joinPartnerIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return null;
+        }
+        return ids.stream().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    /**
+     * Send notification to all partners of a booking
+     */
+    private void notifyPartners(Booking booking, String message) {
+        List<Long> pIds = parsePartnerIds(booking.getPartnerIds());
+        for (Long pid : pIds) {
+            notificationService.sendNotification(pid, booking.getId(), message);
+        }
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -57,19 +99,40 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
             throw new BusinessException(400, "Start time must be earlier than end time");
         }
 
-        // Check for conflicts
-        LambdaQueryWrapper<Booking> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(Booking::getFacilityId, requestDTO.getFacilityId())
-                .eq(Booking::getBookingDate, requestDTO.getBookingDate())
-                .in(Booking::getStatus, BookingStatusEnum.PENDING.getValue(), BookingStatusEnum.APPROVED.getValue())
-                .and(w -> w
-                        .lt(Booking::getStartTime, requestDTO.getEndTime())
-                        .gt(Booking::getEndTime, requestDTO.getStartTime())
-                );
-
-        long conflictCount = this.count(queryWrapper);
+        // Check for conflicts (with pessimistic lock to prevent concurrent double-booking)
+        long conflictCount = baseMapper.countConflictForUpdate(
+                requestDTO.getFacilityId(),
+                requestDTO.getBookingDate(),
+                requestDTO.getStartTime(),
+                requestDTO.getEndTime()
+        );
         if (conflictCount > 0) {
             throw new BusinessException(409, "Time slot is already occupied");
+        }
+
+        // Validate partner relationships if partnerIds are provided
+        List<Long> partnerIdList = requestDTO.getPartnerIds();
+        if (partnerIdList != null && !partnerIdList.isEmpty()) {
+            for (Long partnerId : partnerIdList) {
+                User partner = userService.getById(partnerId);
+                if (partner == null) {
+                    throw new BusinessException(404, "Partner user not found (ID: " + partnerId + ")");
+                }
+                long acceptedCount = partnerRequestMapper.selectCount(
+                        new LambdaQueryWrapper<PartnerRequest>()
+                                .eq(PartnerRequest::getStatus, "accepted")
+                                .and(w -> w
+                                        .and(inner -> inner
+                                                .eq(PartnerRequest::getRequesterId, userId)
+                                                .eq(PartnerRequest::getTargetId, partnerId))
+                                        .or(inner -> inner
+                                                .eq(PartnerRequest::getRequesterId, partnerId)
+                                                .eq(PartnerRequest::getTargetId, userId)))
+                );
+                if (acceptedCount == 0) {
+                    throw new BusinessException(400, "No accepted partner relationship exists with user (ID: " + partnerId + ")");
+                }
+            }
         }
 
         // Create booking
@@ -81,9 +144,19 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                 .endTime(requestDTO.getEndTime())
                 .status(BookingStatusEnum.PENDING.getValue())
                 .activityDescription(requestDTO.getActivityDescription())
+                .partnerIds(joinPartnerIds(partnerIdList))
                 .build();
 
         this.save(booking);
+
+        // Notify all partners about the invitation
+        if (booking.getPartnerIds() != null) {
+            String facilityName = facility.getName();
+            String msg = user.getName() + " has invited you to a shared training session at "
+                    + facilityName + " on " + booking.getBookingDate()
+                    + " (" + booking.getStartTime() + " - " + booking.getEndTime() + "). Booking ID: " + booking.getId();
+            notifyPartners(booking, msg);
+        }
 
         return convertToVO(booking);
     }
@@ -93,7 +166,7 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         LambdaQueryWrapper<Booking> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Booking::getUserId, userId)
                 .orderByDesc(Booking::getBookingDate, Booking::getStartTime);
-        
+
         return this.list(queryWrapper).stream()
                 .map(this::convertToVO)
                 .collect(Collectors.toList());
@@ -122,7 +195,7 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                 .eq(Booking::getBookingDate, date)
                 .in(Booking::getStatus, BookingStatusEnum.PENDING.getValue(), BookingStatusEnum.APPROVED.getValue())
                 .orderByAsc(Booking::getStartTime);
-        
+
         return this.list(queryWrapper).stream()
                 .map(this::convertToVO)
                 .collect(Collectors.toList());
@@ -150,7 +223,6 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                     .collect(Collectors.toList());
 
             if (assignedFacilityIds.isEmpty()) {
-                // Return empty list if staff has no assigned facilities
                 return List.of();
             }
             queryWrapper.in(Booking::getFacilityId, assignedFacilityIds);
@@ -217,6 +289,19 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
             message = "Your booking request (ID: " + bookingId + ") has been rejected. " + note;
         }
         notificationService.sendNotification(booking.getUserId(), bookingId, message);
+
+        // Notify all partners about booking status change
+        if (booking.getPartnerIds() != null) {
+            User booker = userService.getById(booking.getUserId());
+            String bookerName = booker != null ? booker.getName() : "Your partner";
+            String partnerMsg;
+            if (BookingStatusEnum.APPROVED.getValue().equals(normalizedStatus)) {
+                partnerMsg = "The shared training session (ID: " + bookingId + ") with " + bookerName + " has been approved!";
+            } else {
+                partnerMsg = "The shared training session (ID: " + bookingId + ") with " + bookerName + " has been rejected.";
+            }
+            notifyPartners(booking, partnerMsg);
+        }
     }
 
     @Override
@@ -239,6 +324,14 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
 
         booking.setStatus(BookingStatusEnum.CANCELLED.getValue());
         this.updateById(booking);
+
+        // Notify all partners about cancellation
+        if (booking.getPartnerIds() != null) {
+            User booker = userService.getById(userId);
+            String bookerName = booker != null ? booker.getName() : "Your partner";
+            String msg = bookerName + " has cancelled the shared training session (ID: " + bookingId + ").";
+            notifyPartners(booking, msg);
+        }
     }
 
     @Override
@@ -275,9 +368,26 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         // 自动向会员发送完成通知
         String message = "Your facility booking (ID: " + bookingId + ") has been confirmed completed by staff. Thank you for using the sports center facilities!";
         notificationService.sendNotification(booking.getUserId(), bookingId, message);
+
+        // Notify all partners about completion
+        if (booking.getPartnerIds() != null) {
+            User booker = userService.getById(booking.getUserId());
+            String bookerName = booker != null ? booker.getName() : "Your partner";
+            String partnerMsg = "The shared training session (ID: " + bookingId + ") with " + bookerName + " has been marked as completed. Thank you!";
+            notifyPartners(booking, partnerMsg);
+        }
     }
 
     private BookingVO convertToVO(Booking booking) {
+        List<Long> pIds = parsePartnerIds(booking.getPartnerIds());
+        List<String> pNames = pIds.stream()
+                .map(id -> {
+                    User partner = userService.getById(id);
+                    return partner != null ? partner.getName() : null;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
         return BookingVO.builder()
                 .id(booking.getId())
                 .userId(booking.getUserId())
@@ -289,6 +399,8 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                 .activityDescription(booking.getActivityDescription())
                 .staffNote(booking.getStaffNote())
                 .suggestedFacilityId(booking.getSuggestedFacilityId())
+                .partnerIds(pIds.isEmpty() ? null : pIds)
+                .partnerNames(pNames.isEmpty() ? null : pNames)
                 .createdAt(booking.getCreatedAt())
                 .build();
     }

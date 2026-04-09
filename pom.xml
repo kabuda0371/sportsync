@@ -81,17 +81,10 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- 专门解决部分 IDEA 旧版本内置 TestRunner 找不到 MethodSelector.getMethodParameterTypes() 的问题 -->
+		<!-- JUnit Platform Launcher (version managed by Spring Boot BOM) -->
 		<dependency>
 			<groupId>org.junit.platform</groupId>
 			<artifactId>junit-platform-launcher</artifactId>
-			<version>1.8.2</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-engine</artifactId>
-			<version>5.8.2</version>
 			<scope>test</scope>
 		</dependency>
 
@@ -126,6 +119,19 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
+		<!-- Spring Boot Mail (邮件发送) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
+		<!-- Google API Client (用于验证 Google ID Token) -->
+		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client</artifactId>
+			<version>2.2.0</version>
 		</dependency>
 
 		<!-- JWT -->

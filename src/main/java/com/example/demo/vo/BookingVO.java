@@ -9,6 +9,7 @@ import lombok.AllArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -35,6 +36,10 @@ public class BookingVO {
     private String staffNote;
     @Schema(description = "建议替代设施ID（当拒绝时工作人员可提供替代方案）")
     private Long suggestedFacilityId;
+    @Schema(description = "共享预订伙伴用户ID列表")
+    private List<Long> partnerIds;
+    @Schema(description = "共享预订伙伴姓名列表")
+    private List<String> partnerNames;
     @Schema(description = "创建时间")
     private LocalDateTime createdAt;
 }

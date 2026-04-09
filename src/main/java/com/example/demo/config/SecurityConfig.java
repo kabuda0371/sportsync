@@ -39,10 +39,13 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html"
                         ).permitAll()
-                        // 放行登录和注册接口
+                        // 放行登录、注册和邮箱验证相关接口
                         .requestMatchers(
                                 "/api/users/login",
-                                "/api/users/register"
+                                "/api/users/register",
+                                "/api/users/google-login",
+                                "/api/users/verify-email",
+                                "/api/users/resend-verification"
                         ).permitAll()
                         // 其他所有接口均需认证
                         .anyRequest().authenticated()

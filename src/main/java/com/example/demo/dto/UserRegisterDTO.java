@@ -22,8 +22,8 @@ public class UserRegisterDTO {
     private String email;
 
     @NotBlank(message = "Password cannot be empty")
-    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,20}$", message = "Password must contain uppercase and lowercase letters, numbers, and special characters, and be 8-20 characters long")
-    @Schema(description = "强密码，必须包含大小写字母、数字和特殊字符，长度8-20", example = "StrongP@ss123", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^a-zA-Z\\d\\s])[^\\s]{8,30}$", message = "Password must be 8-30 characters and include uppercase, lowercase, numbers, and special characters")
+    @Schema(description = "强密码，必须包含大小写字母、数字和特殊字符，长度8-30", example = "StrongP@ss123", requiredMode = Schema.RequiredMode.REQUIRED)
     private String password;
 
     @NotBlank(message = "Name cannot be empty")
