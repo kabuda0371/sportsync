@@ -209,11 +209,14 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
             throw new BusinessException(403, "No permission to view pending bookings");
         }
 
+        // Return both pending (needs review) and approved (needs completion) bookings
         LambdaQueryWrapper<Booking> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(Booking::getStatus, BookingStatusEnum.PENDING.getValue())
+        queryWrapper.in(Booking::getStatus,
+                        BookingStatusEnum.PENDING.getValue(),
+                        BookingStatusEnum.APPROVED.getValue())
                 .orderByAsc(Booking::getBookingDate, Booking::getStartTime);
 
-        // 如果是 STAFF，只显示分配给该员工的设施的预订
+        // If STAFF, filter to assigned facilities only; if no facilities assigned, show all
         if (UserRoleEnum.STAFF.getValue().equals(user.getRole())) {
             List<Long> assignedFacilityIds = facilityService.lambdaQuery()
                     .eq(Facility::getAssignedStaffId, staffId)
@@ -222,10 +225,9 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                     .map(Facility::getId)
                     .collect(Collectors.toList());
 
-            if (assignedFacilityIds.isEmpty()) {
-                return List.of();
+            if (!assignedFacilityIds.isEmpty()) {
+                queryWrapper.in(Booking::getFacilityId, assignedFacilityIds);
             }
-            queryWrapper.in(Booking::getFacilityId, assignedFacilityIds);
         }
 
         return this.list(queryWrapper).stream()

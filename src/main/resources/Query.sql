@@ -110,3 +110,17 @@ ALTER TABLE bookings ADD COLUMN partner_ids VARCHAR(255) NULL;
 UPDATE bookings SET partner_ids = CAST(partner_id AS CHAR) WHERE partner_id IS NOT NULL;
 ALTER TABLE bookings DROP FOREIGN KEY bookings_ibfk_N; -- 先删外键
 ALTER TABLE bookings DROP COLUMN partner_id;
+
+-- 设备报修表
+CREATE TABLE equipment_reports (
+    report_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id   BIGINT NOT NULL,
+    facility_id BIGINT NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'noted'
+        CHECK (status IN ('noted', 'repair_in_progress', 'resolved')),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (facility_id) REFERENCES facilities(facility_id) ON DELETE CASCADE
+);
