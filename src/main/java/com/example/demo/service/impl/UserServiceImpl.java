@@ -32,8 +32,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.demo.security.LoginRateLimiter;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -203,6 +206,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setAccountStatus(AccountStatusEnum.SUSPENDED.getValue());
         this.updateById(user);
         log.info("用户已注销账号，ID: {}", userId);
+    }
+
+    @Override
+    public IPage<UserVO> listUsers(int page, int size, String role, String status) {
+        IPage<User> userPage = this.lambdaQuery()
+                .eq(role != null && !role.isBlank(), User::getRole, role)
+                .eq(status != null && !status.isBlank(), User::getAccountStatus, status)
+                .orderByDesc(User::getId)
+                .page(new Page<>(page, size));
+        Page<UserVO> voPage = new Page<>(page, size);
+        voPage.setTotal(userPage.getTotal());
+        voPage.setRecords(userPage.getRecords().stream().map(userConverter::toVO).collect(Collectors.toList()));
+        return voPage;
     }
 
     @Override

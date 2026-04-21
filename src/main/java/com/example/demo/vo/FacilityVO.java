@@ -29,4 +29,8 @@ public class FacilityVO {
     private Long assignedStaffId;
     @Schema(description = "指派管理员姓名")
     private String assignedStaffName;
+    @Schema(description = "纬度")
+    private Double latitude;
+    @Schema(description = "经度")
+    private Double longitude;
 }

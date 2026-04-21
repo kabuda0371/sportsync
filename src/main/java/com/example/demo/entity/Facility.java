@@ -36,6 +36,10 @@ public class Facility {
 
     private Long assignedStaffId;
 
+    private Double latitude;
+
+    private Double longitude;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     

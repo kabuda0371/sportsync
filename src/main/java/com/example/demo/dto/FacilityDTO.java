@@ -37,4 +37,10 @@ public class FacilityDTO {
 
     @Schema(description = "指派管理员ID", example = "2")
     private Long assignedStaffId;
+
+    @Schema(description = "纬度", example = "51.5074")
+    private Double latitude;
+
+    @Schema(description = "经度", example = "-0.1278")
+    private Double longitude;
 }

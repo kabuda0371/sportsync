@@ -1,6 +1,8 @@
 package com.example.demo.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.demo.dto.CreateReportDTO;
 import com.example.demo.dto.UpdateReportStatusDTO;
@@ -58,14 +60,17 @@ public class EquipmentReportServiceImpl extends ServiceImpl<EquipmentReportMappe
     }
 
     @Override
-    public List<EquipmentReportVO> getAllReports(Long staffId) {
+    public IPage<EquipmentReportVO> getAllReports(Long staffId, int page, int size, String status) {
         validateStaffOrAdmin(staffId);
 
         User staff = userService.getById(staffId);
         LambdaQueryWrapper<EquipmentReport> query = new LambdaQueryWrapper<EquipmentReport>()
                 .orderByDesc(EquipmentReport::getCreatedAt);
 
-        // 普通 staff 只看分配给自己设施的报告
+        if (status != null && !status.isBlank()) {
+            query.eq(EquipmentReport::getStatus, status);
+        }
+
         if (UserRoleEnum.STAFF.getValue().equals(staff.getRole())) {
             List<Long> assignedFacilityIds = facilityService.lambdaQuery()
                     .eq(Facility::getAssignedStaffId, staffId)
@@ -75,18 +80,25 @@ public class EquipmentReportServiceImpl extends ServiceImpl<EquipmentReportMappe
                     .collect(Collectors.toList());
 
             if (assignedFacilityIds.isEmpty()) {
-                return List.of();
+                Page<EquipmentReportVO> empty = new Page<>(page, size);
+                empty.setTotal(0);
+                empty.setRecords(List.of());
+                return empty;
             }
             query.in(EquipmentReport::getFacilityId, assignedFacilityIds);
         }
 
-        return this.list(query).stream()
+        IPage<EquipmentReport> reportPage = this.page(new Page<>(page, size), query);
+        Page<EquipmentReportVO> voPage = new Page<>(page, size);
+        voPage.setTotal(reportPage.getTotal());
+        voPage.setRecords(reportPage.getRecords().stream()
                 .map(r -> {
                     Facility facility = facilityService.getById(r.getFacilityId());
                     User reporter = userService.getById(r.getUserId());
                     return convertToVO(r, facility, reporter);
                 })
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+        return voPage;
     }
 
     @Override

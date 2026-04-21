@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.example.demo.common.Result;
 import com.example.demo.common.UserContext;
 import com.example.demo.dto.CreateReportDTO;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -47,9 +49,12 @@ public class EquipmentReportController {
 
     @GetMapping
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-    public Result<List<EquipmentReportVO>> getAllReports() {
+    public Result<IPage<EquipmentReportVO>> getAllReports(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "6") int size,
+            @RequestParam(required = false) String status) {
         Long staffId = UserContext.getUserId();
-        return Result.success(equipmentReportService.getAllReports(staffId));
+        return Result.success(equipmentReportService.getAllReports(staffId, page, size, status));
     }
 
     @PutMapping("/{id}/status")

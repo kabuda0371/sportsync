@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.demo.entity.Booking;
 import com.example.demo.dto.BookingRequestDTO;
@@ -14,9 +15,8 @@ public interface BookingService extends IService<Booking> {
     List<BookingVO> getUserBookings(Long userId);
     List<BookingVO> getUpcomingBookings(Long userId);
     List<BookingVO> getBookingsForFacilityAndDate(Long facilityId, LocalDate date);
-    List<BookingVO> getPendingBookings(Long staffId);
+    IPage<BookingVO> getPendingBookings(Long staffId, int page, int size, String status);
     void updateBookingStatus(Long staffId, Long bookingId, BookingStatusUpdateDTO reviewDTO);
     void cancelBooking(Long userId, Long bookingId);
-
     void markBookingCompleted(Long staffId, Long bookingId);
 }

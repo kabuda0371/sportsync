@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.demo.dto.GoogleLoginDTO;
 import com.example.demo.dto.ProfileUpdateDTO;
@@ -8,6 +9,16 @@ import com.example.demo.entity.User;
 import com.example.demo.vo.UserVO;
 
 public interface UserService extends IService<User> {
+
+    /**
+     * 管理员分页/筛选查询用户列表
+     * @param page   页码（从1开始）
+     * @param size   每页条数
+     * @param role   可选角色过滤
+     * @param status 可选状态过滤
+     */
+    IPage<UserVO> listUsers(int page, int size, String role, String status);
+
     
     /**
      * 注册新用户

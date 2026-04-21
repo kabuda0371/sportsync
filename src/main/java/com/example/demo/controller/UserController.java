@@ -21,6 +21,7 @@ import com.example.demo.dto.UserRegisterDTO;
 import com.example.demo.dto.UserLoginDTO;
 import com.example.demo.dto.VerifyEmailDTO;
 import com.example.demo.service.UserService;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.example.demo.vo.UserVO;
 import com.example.demo.common.Result;
 import com.example.demo.common.UserContext;
@@ -93,6 +94,18 @@ public class UserController {
         Long userId = UserContext.getUserId();
         userService.deactivateAccount(userId);
         return Result.success("账号已注销", null);
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "查询用户列表（分页）", description = "管理员根据角色或账号状态分页筛选用户")
+    public Result<IPage<UserVO>> listUsers(
+            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页条数，默认10") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "角色过滤：member/staff/admin") @RequestParam(required = false) String role,
+            @Parameter(description = "账号状态过滤：pending/approved/suspended") @RequestParam(required = false) String status) {
+        IPage<UserVO> result = userService.listUsers(page, size, role, status);
+        return Result.success("查询成功", result);
     }
 
     @PutMapping("/{id}/status")

@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.demo.dto.CreateReportDTO;
 import com.example.demo.dto.UpdateReportStatusDTO;
@@ -12,7 +13,7 @@ public interface EquipmentReportService extends IService<EquipmentReport> {
 
     EquipmentReportVO createReport(Long userId, CreateReportDTO dto);
 
-    List<EquipmentReportVO> getAllReports(Long staffId);
+    IPage<EquipmentReportVO> getAllReports(Long staffId, int page, int size, String status);
 
     List<EquipmentReportVO> getMyReports(Long userId);
 

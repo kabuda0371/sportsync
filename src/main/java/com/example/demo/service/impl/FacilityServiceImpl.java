@@ -113,6 +113,8 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
                 .capacityLimit(dto.getCapacityLimit())
                 .timeSlotLimitMinutes(dto.getTimeSlotLimitMinutes())
                 .assignedStaffId(dto.getAssignedStaffId())
+                .latitude(dto.getLatitude())
+                .longitude(dto.getLongitude())
                 .build();
         this.save(facility);
         clearFacilityCache();
@@ -131,6 +133,8 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
         existingFacility.setCapacityLimit(dto.getCapacityLimit());
         existingFacility.setTimeSlotLimitMinutes(dto.getTimeSlotLimitMinutes());
         existingFacility.setAssignedStaffId(dto.getAssignedStaffId());
+        existingFacility.setLatitude(dto.getLatitude());
+        existingFacility.setLongitude(dto.getLongitude());
 
         this.updateById(existingFacility);
         clearFacilityCache();
@@ -182,6 +186,8 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
                 .capacityLimit(facility.getCapacityLimit())
                 .timeSlotLimitMinutes(facility.getTimeSlotLimitMinutes())
                 .assignedStaffId(facility.getAssignedStaffId())
+                .latitude(facility.getLatitude())
+                .longitude(facility.getLongitude())
                 .build();
 
         if (facility.getAssignedStaffId() != null) {

@@ -19,6 +19,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -69,9 +71,12 @@ public class BookingController {
     @GetMapping("/pending")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @Operation(summary = "查询待审批预订", description = "获取所有待审批的预订记录，仅限员工或管理员")
-    public Result<List<BookingVO>> getPendingBookings() {
+    public Result<IPage<BookingVO>> getPendingBookings(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "6") int size,
+            @RequestParam(required = false) String status) {
         Long staffId = UserContext.getUserId();
-        return Result.success(bookingService.getPendingBookings(staffId));
+        return Result.success(bookingService.getPendingBookings(staffId, page, size, status));
     }
 
     @PutMapping("/{id}/status")

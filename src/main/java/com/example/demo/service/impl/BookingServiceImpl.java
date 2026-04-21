@@ -1,6 +1,8 @@
 package com.example.demo.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.demo.dto.BookingRequestDTO;
 import com.example.demo.dto.BookingStatusUpdateDTO;
@@ -202,21 +204,23 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
     }
 
     @Override
-    public List<BookingVO> getPendingBookings(Long staffId) {
-        // Validate staff role
+    public IPage<BookingVO> getPendingBookings(Long staffId, int page, int size, String status) {
         User user = userService.getById(staffId);
         if (user == null || (!UserRoleEnum.STAFF.getValue().equals(user.getRole()) && !UserRoleEnum.ADMIN.getValue().equals(user.getRole()))) {
             throw new BusinessException(403, "No permission to view pending bookings");
         }
 
-        // Return both pending (needs review) and approved (needs completion) bookings
         LambdaQueryWrapper<Booking> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.in(Booking::getStatus,
-                        BookingStatusEnum.PENDING.getValue(),
-                        BookingStatusEnum.APPROVED.getValue())
-                .orderByAsc(Booking::getBookingDate, Booking::getStartTime);
 
-        // If STAFF, filter to assigned facilities only; if no facilities assigned, show all
+        if (status != null && !status.isBlank()) {
+            queryWrapper.eq(Booking::getStatus, status);
+        } else {
+            queryWrapper.in(Booking::getStatus,
+                    BookingStatusEnum.PENDING.getValue(),
+                    BookingStatusEnum.APPROVED.getValue());
+        }
+        queryWrapper.orderByAsc(Booking::getBookingDate, Booking::getStartTime);
+
         if (UserRoleEnum.STAFF.getValue().equals(user.getRole())) {
             List<Long> assignedFacilityIds = facilityService.lambdaQuery()
                     .eq(Facility::getAssignedStaffId, staffId)
@@ -225,14 +229,22 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                     .map(Facility::getId)
                     .collect(Collectors.toList());
 
-            if (!assignedFacilityIds.isEmpty()) {
-                queryWrapper.in(Booking::getFacilityId, assignedFacilityIds);
+            if (assignedFacilityIds.isEmpty()) {
+                Page<BookingVO> empty = new Page<>(page, size);
+                empty.setTotal(0);
+                empty.setRecords(List.of());
+                return empty;
             }
+            queryWrapper.in(Booking::getFacilityId, assignedFacilityIds);
         }
 
-        return this.list(queryWrapper).stream()
+        IPage<Booking> bookingPage = this.page(new Page<>(page, size), queryWrapper);
+        Page<BookingVO> voPage = new Page<>(page, size);
+        voPage.setTotal(bookingPage.getTotal());
+        voPage.setRecords(bookingPage.getRecords().stream()
                 .map(this::convertToVO)
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+        return voPage;
     }
 
     @Override

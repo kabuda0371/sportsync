@@ -52,6 +52,8 @@ CREATE TABLE facilities (
     capacity_limit INT,
     time_slot_limit_minutes INT,
     assigned_staff_id INT,
+    latitude DOUBLE NULL,
+    longitude DOUBLE NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -65,7 +67,7 @@ CREATE TABLE bookings (
                           start_time TIME NOT NULL,
                           end_time TIME NOT NULL,
                           status VARCHAR(20) DEFAULT 'pending' NOT NULL
-                              CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled', 'completed')),
+                              CHECK (status IN ('pending', 'approved ', 'rejected', 'cancelled', 'completed')),
                           activity_description TEXT NULL COMMENT '会员预期活动描述',
                           staff_note TEXT NULL COMMENT '工作人员审批备注',
                           suggested_facility_id INT NULL COMMENT '建议替代设施ID',
@@ -106,10 +108,25 @@ drop table bookings;
 SET FOREIGN_KEY_CHECKS = 1;
 
 
+SELECT facility_id, name, latitude, longitude FROM facilities;
+
+
+INSERT INTO facilities (name, type, description, usage_guidelines, capacity_limit, time_slot_limit_minutes, latitude, longitude)
+VALUES
+    ('Main Badminton Court', 'Badminton', 'Indoor standard badminton court with professional lighting.', 'Soft-soled shoes required. Wipe equipment after use.', 4, 60, 51.5080, -0.1270),
+    ('Tennis Court A', 'Tennis', 'Outdoor hard-surface tennis court.', 'Bring your own racket. No food on court.', 4, 60, 51.5075, -0.1265),
+    ('Swimming Pool', 'Swimming', 'Olympic-size indoor swimming pool, 8 lanes.', 'Swim cap required. No diving in shallow end.', 20, 60, 51.5068, -0.1280),
+    ('Gym Hall', 'Gym', 'Fully equipped gym with cardio and weight machines.', 'Wipe machines after use. Closed-toe shoes only.', 30, 60, 51.5085, -0.1275),
+    ('Football Pitch', 'Football', 'Full-size outdoor football pitch with natural grass.', 'Football boots only. No bikes on pitch.', 22, 90, 51.5072, -0.1260);
+
 ALTER TABLE bookings ADD COLUMN partner_ids VARCHAR(255) NULL;
 UPDATE bookings SET partner_ids = CAST(partner_id AS CHAR) WHERE partner_id IS NOT NULL;
 ALTER TABLE bookings DROP FOREIGN KEY bookings_ibfk_N; -- 先删外键
 ALTER TABLE bookings DROP COLUMN partner_id;
+
+-- 地图功能：给已存在的 facilities 表加经纬度列
+ALTER TABLE facilities ADD COLUMN latitude DOUBLE NULL;
+ALTER TABLE facilities ADD COLUMN longitude DOUBLE NULL;
 
 -- 设备报修表
 CREATE TABLE equipment_reports (
