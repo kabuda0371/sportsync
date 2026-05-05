@@ -7,6 +7,7 @@ import lombok.Getter;
  */
 @Getter
 public enum BookingStatusEnum {
+    AWAITING_PARTNER("awaiting_partner", "等待搭档确认"),
     PENDING("pending", "待审批"),
     APPROVED("approved", "已批准"),
     REJECTED("rejected", "已拒绝"),

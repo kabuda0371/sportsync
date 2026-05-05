@@ -1,48 +1,32 @@
 CREATE DATABASE IF NOT EXISTS sports_centre_db;
 USE sports_centre_db;
 
--- 用户表
+-- Users
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    -- 角色区分：会员、员工、管理员
-    role VARCHAR(20) DEFAULT 'member' NOT NULL
+    role VARCHAR(20) NOT NULL DEFAULT 'member'
         CHECK (role IN ('member', 'staff', 'admin')),
-
-    -- 登录邮箱，必须唯一
-    email VARCHAR(255) UNIQUE NOT NULL,
-
-    -- 密码哈希值，第三方登录时允许为 NULL
+    email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255),
-
-    -- 个人基本信息
     name VARCHAR(100) NOT NULL,
     date_of_birth DATE,
     address TEXT,
-
-    -- 账号状态
-    account_status VARCHAR(20) DEFAULT 'approved' NOT NULL
+    account_status VARCHAR(20) NOT NULL DEFAULT 'approved'
         CHECK (account_status IN ('pending', 'approved', 'suspended')),
-
-    -- 伙伴匹配档案字段（仅限会员，选填）
     is_partner_matching_enabled BOOLEAN DEFAULT FALSE,
-    preferred_sport VARCHAR(100) COMMENT '偏好运动，逗号分隔，如 badminton,tennis',
+    preferred_sport VARCHAR(100) COMMENT 'Preferred sports, comma-separated, e.g. badminton,tennis',
     skill_level VARCHAR(50)
         CHECK (skill_level IN ('beginner', 'intermediate', 'advanced')),
-    availability VARCHAR(255) COMMENT '可用时间，逗号分隔，如 weekday_evening,weekend_morning',
-    partner_bio VARCHAR(500) NULL COMMENT '伙伴匹配活动简介',
-
-    -- 第三方登录
-    auth_provider VARCHAR(50) DEFAULT 'local' NOT NULL
+    availability VARCHAR(255) COMMENT 'Available time slots, comma-separated, e.g. weekday_evening,weekend_morning',
+    partner_bio VARCHAR(500) NULL COMMENT 'Short bio for partner matching',
+    auth_provider VARCHAR(50) NOT NULL DEFAULT 'local'
         CHECK (auth_provider IN ('local', 'google', 'facebook')),
     social_id VARCHAR(255) UNIQUE,
-
-    -- 时间戳
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 体育设施表
+-- Facilities
 CREATE TABLE facilities (
     facility_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -58,29 +42,31 @@ CREATE TABLE facilities (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 预订表
+-- Bookings
 CREATE TABLE bookings (
-                          booking_id INT AUTO_INCREMENT PRIMARY KEY,
-                          user_id INT NOT NULL,
-                          facility_id INT NOT NULL,
-                          booking_date DATE NOT NULL,
-                          start_time TIME NOT NULL,
-                          end_time TIME NOT NULL,
-                          status VARCHAR(20) DEFAULT 'pending' NOT NULL
-                              CHECK (status IN ('pending', 'approved ', 'rejected', 'cancelled', 'completed')),
-                          activity_description TEXT NULL COMMENT '会员预期活动描述',
-                          staff_note TEXT NULL COMMENT '工作人员审批备注',
-                          suggested_facility_id INT NULL COMMENT '建议替代设施ID',
-                          partner_ids VARCHAR(255) NULL COMMENT '共享预订伙伴用户ID列表，逗号分隔',
-                          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    booking_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    facility_id INT NOT NULL,
+    booking_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'awaiting_partner', 'approved', 'rejected', 'cancelled', 'completed')),
+    activity_description TEXT NULL COMMENT 'Member provided activity details',
+    staff_note TEXT NULL COMMENT 'Staff review note',
+    suggested_facility_id INT NULL COMMENT 'Suggested replacement facility ID',
+    partner_ids VARCHAR(255) NULL COMMENT 'Shared booking partner user IDs, comma-separated',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 站内通知表
+-- Notifications
 CREATE TABLE notifications (
     notification_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    booking_id INT NOT NULL,
+    type VARCHAR(64) NOT NULL DEFAULT 'GENERAL',
+    related_id BIGINT NULL,
+    booking_id INT NULL,
     message VARCHAR(500) NOT NULL,
     is_read TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -88,7 +74,7 @@ CREATE TABLE notifications (
     FOREIGN KEY (booking_id) REFERENCES bookings(booking_id) ON DELETE CASCADE
 );
 
--- 伙伴配对请求表
+-- Partner matching requests
 CREATE TABLE partner_requests (
     request_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     requester_id INT NOT NULL,
@@ -100,39 +86,14 @@ CREATE TABLE partner_requests (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (requester_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (target_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY uk_requester_target (requester_id, target_id)
+    UNIQUE KEY uq_requester_target (requester_id, target_id)
 );
 
-SET FOREIGN_KEY_CHECKS = 0;
-drop table bookings;
-SET FOREIGN_KEY_CHECKS = 1;
-
-
-SELECT facility_id, name, latitude, longitude FROM facilities;
-
-
-INSERT INTO facilities (name, type, description, usage_guidelines, capacity_limit, time_slot_limit_minutes, latitude, longitude)
-VALUES
-    ('Main Badminton Court', 'Badminton', 'Indoor standard badminton court with professional lighting.', 'Soft-soled shoes required. Wipe equipment after use.', 4, 60, 51.5080, -0.1270),
-    ('Tennis Court A', 'Tennis', 'Outdoor hard-surface tennis court.', 'Bring your own racket. No food on court.', 4, 60, 51.5075, -0.1265),
-    ('Swimming Pool', 'Swimming', 'Olympic-size indoor swimming pool, 8 lanes.', 'Swim cap required. No diving in shallow end.', 20, 60, 51.5068, -0.1280),
-    ('Gym Hall', 'Gym', 'Fully equipped gym with cardio and weight machines.', 'Wipe machines after use. Closed-toe shoes only.', 30, 60, 51.5085, -0.1275),
-    ('Football Pitch', 'Football', 'Full-size outdoor football pitch with natural grass.', 'Football boots only. No bikes on pitch.', 22, 90, 51.5072, -0.1260);
-
-ALTER TABLE bookings ADD COLUMN partner_ids VARCHAR(255) NULL;
-UPDATE bookings SET partner_ids = CAST(partner_id AS CHAR) WHERE partner_id IS NOT NULL;
-ALTER TABLE bookings DROP FOREIGN KEY bookings_ibfk_N; -- 先删外键
-ALTER TABLE bookings DROP COLUMN partner_id;
-
--- 地图功能：给已存在的 facilities 表加经纬度列
-ALTER TABLE facilities ADD COLUMN latitude DOUBLE NULL;
-ALTER TABLE facilities ADD COLUMN longitude DOUBLE NULL;
-
--- 设备报修表
+-- Equipment reports
 CREATE TABLE equipment_reports (
     report_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id   BIGINT NOT NULL,
-    facility_id BIGINT NOT NULL,
+    user_id INT NOT NULL,
+    facility_id INT NOT NULL,
     description TEXT NOT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'noted'
         CHECK (status IN ('noted', 'repair_in_progress', 'resolved')),
@@ -141,3 +102,52 @@ CREATE TABLE equipment_reports (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (facility_id) REFERENCES facilities(facility_id) ON DELETE CASCADE
 );
+
+-- Booking invitations
+CREATE TABLE booking_invitations (
+    invitation_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    invitee_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'accepted', 'declined')),
+    responded_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (booking_id) REFERENCES bookings(booking_id) ON DELETE CASCADE,
+    FOREIGN KEY (invitee_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_booking_invitee (booking_id, invitee_id)
+);
+
+-- Existing database upgrade
+-- If your database was created before shared booking support was added,
+-- run the statements below once to align bookings_chk_1 with the current code.
+--
+-- ALTER TABLE bookings
+--     DROP CHECK bookings_chk_1;
+--
+-- ALTER TABLE bookings
+--     ADD CONSTRAINT bookings_chk_1
+--         CHECK (status IN (
+--             'pending',
+--             'awaiting_partner',
+--             'approved',
+--             'rejected',
+--             'cancelled',
+--             'completed'
+--         ));
+
+
+INSERT INTO facilities (
+    name,
+    type,
+    description,
+    usage_guidelines,
+    capacity_limit,
+    time_slot_limit_minutes,
+    latitude,
+    longitude
+) VALUES
+    ('Main Badminton Court', 'Badminton', 'Indoor standard badminton court with professional lighting.', 'Soft-soled shoes required. Wipe equipment after use.', 4, 60, 51.5080, -0.1270),
+    ('Tennis Court A', 'Tennis', 'Outdoor hard-surface tennis court.', 'Bring your own racket. No food on court.', 4, 60, 51.5075, -0.1265),
+    ('Swimming Pool', 'Swimming', 'Olympic-size indoor swimming pool, 8 lanes.', 'Swim cap required. No diving in shallow end.', 20, 60, 51.5068, -0.1280),
+    ('Gym Hall', 'Gym', 'Fully equipped gym with cardio and weight machines.', 'Wipe machines after use. Closed-toe shoes only.', 30, 60, 51.5085, -0.1275),
+    ('Football Pitch', 'Football', 'Full-size outdoor football pitch with natural grass.', 'Football boots only. No bikes on pitch.', 22, 90, 51.5072, -0.1260);

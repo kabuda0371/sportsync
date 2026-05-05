@@ -14,12 +14,14 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import org.springframework.http.HttpMethod;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * JWT 认证过滤器，用于解析 Token 并设置 Spring Security 上下文
@@ -30,6 +32,20 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private static final Set<String> PUBLIC_PATHS = Set.of(
+            "/api/users/login",
+            "/api/users/register",
+            "/api/users/google-login",
+            "/api/users/verify-email",
+            "/api/users/resend-verification",
+            "/api/users/forgot-password",
+            "/api/users/reset-password"
+    );
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return HttpMethod.OPTIONS.matches(request.getMethod()) || PUBLIC_PATHS.contains(request.getServletPath());
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,

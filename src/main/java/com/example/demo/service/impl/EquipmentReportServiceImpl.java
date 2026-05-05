@@ -9,12 +9,14 @@ import com.example.demo.dto.UpdateReportStatusDTO;
 import com.example.demo.entity.EquipmentReport;
 import com.example.demo.entity.Facility;
 import com.example.demo.entity.User;
+import com.example.demo.enums.NotificationTypeEnum;
 import com.example.demo.enums.ReportStatusEnum;
 import com.example.demo.enums.UserRoleEnum;
 import com.example.demo.exception.BusinessException;
 import com.example.demo.mapper.EquipmentReportMapper;
 import com.example.demo.service.EquipmentReportService;
 import com.example.demo.service.FacilityService;
+import com.example.demo.service.NotificationService;
 import com.example.demo.service.UserService;
 import com.example.demo.vo.EquipmentReportVO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -36,9 +39,18 @@ public class EquipmentReportServiceImpl extends ServiceImpl<EquipmentReportMappe
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private NotificationService notificationService;
+
     private static final Set<String> VALID_STATUSES = Arrays.stream(ReportStatusEnum.values())
             .map(ReportStatusEnum::getValue)
             .collect(Collectors.toSet());
+
+    private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
+            "noted",              Set.of("repair_in_progress", "resolved"),
+            "repair_in_progress", Set.of("resolved"),
+            "resolved",           Set.of()
+    );
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -131,6 +143,12 @@ public class EquipmentReportServiceImpl extends ServiceImpl<EquipmentReportMappe
             throw new BusinessException(404, "Report not found");
         }
 
+        Set<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(report.getStatus(), Set.of());
+        if (!allowed.contains(newStatus)) {
+            throw new BusinessException(400,
+                    "Cannot transition report from '" + report.getStatus() + "' to '" + newStatus + "'");
+        }
+
         // 普通 staff 只能更新分配给自己设施的报告
         User staff = userService.getById(staffId);
         if (UserRoleEnum.STAFF.getValue().equals(staff.getRole())) {
@@ -142,6 +160,26 @@ public class EquipmentReportServiceImpl extends ServiceImpl<EquipmentReportMappe
 
         report.setStatus(newStatus);
         this.updateById(report);
+
+        Facility facility = facilityService.getById(report.getFacilityId());
+        String facilityName = facility != null ? facility.getName() : "your reported facility";
+        String message = buildStatusMessage(report.getId(), facilityName, newStatus);
+        notificationService.sendNotification(
+                report.getUserId(),
+                NotificationTypeEnum.REPORT.getValue(),
+                report.getId(),
+                null,
+                message);
+    }
+
+    private String buildStatusMessage(Long reportId, String facilityName, String status) {
+        String label = switch (status) {
+            case "noted" -> "has been received and noted";
+            case "repair_in_progress" -> "is now being actively repaired";
+            case "resolved" -> "has been resolved";
+            default -> "has been updated to: " + status;
+        };
+        return String.format("Your issue report #%d for \"%s\" %s.", reportId, facilityName, label);
     }
 
     private void validateStaffOrAdmin(Long userId) {

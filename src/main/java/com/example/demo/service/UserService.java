@@ -2,8 +2,10 @@ package com.example.demo.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.example.demo.dto.CreateInternalUserDTO;
 import com.example.demo.dto.GoogleLoginDTO;
 import com.example.demo.dto.ProfileUpdateDTO;
+import com.example.demo.dto.ResetPasswordDTO;
 import com.example.demo.dto.UserRegisterDTO;
 import com.example.demo.entity.User;
 import com.example.demo.vo.UserVO;
@@ -17,7 +19,7 @@ public interface UserService extends IService<User> {
      * @param role   可选角色过滤
      * @param status 可选状态过滤
      */
-    IPage<UserVO> listUsers(int page, int size, String role, String status);
+    IPage<UserVO> listUsers(Long adminId, int page, int size, String role, String status);
 
     
     /**
@@ -51,7 +53,7 @@ public interface UserService extends IService<User> {
      * @param userId 用户 ID
      * @param status 新的账号状态
      */
-    void updateUserStatus(Long userId, String status);
+    void updateUserStatus(Long adminId, Long userId, String status);
 
     /**
      * Google 第三方登录
@@ -80,4 +82,24 @@ public interface UserService extends IService<User> {
      * @param email 用户邮箱
      */
     void resendVerificationCode(String email);
+
+    /**
+     * 发送密码重置验证码
+     * @param email 用户邮箱
+     */
+    void sendPasswordResetCode(String email);
+
+    /**
+     * 重置密码
+     * @param resetPasswordDTO 重置密码参数
+     */
+    void resetPassword(ResetPasswordDTO resetPasswordDTO);
+
+    /**
+     * 管理员直接创建内部员工账号（Staff / Admin），账号立即激活，无需邮箱验证
+     * @param adminId 操作管理员 ID
+     * @param dto     新账号信息
+     * @return 创建成功的用户信息
+     */
+    UserVO createInternalUser(Long adminId, CreateInternalUserDTO dto);
 }

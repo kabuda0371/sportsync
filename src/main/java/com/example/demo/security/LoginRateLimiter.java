@@ -32,11 +32,16 @@ public class LoginRateLimiter {
      */
     public void checkLockout(String email) {
         String lockKey = LOCK_KEY_PREFIX + email;
-        Long expire = stringRedisTemplate.getExpire(lockKey, TimeUnit.MINUTES);
-        
-        if (expire != null && expire > 0) {
-            log.warn("防爆破拦截：源自邮箱 {} 的高频异常调用，账号已被锁定，剩余解锁时间约 {} 分钟", email, expire);
-            throw new BusinessException("Too many incorrect password attempts, account locked. Please try again in " + expire + " minutes!");
+        try {
+            Long expire = stringRedisTemplate.getExpire(lockKey, TimeUnit.MINUTES);
+            if (expire != null && expire > 0) {
+                log.warn("防爆破拦截：源自邮箱 {} 的高频异常调用，账号已被锁定，剩余解锁时间约 {} 分钟", email, expire);
+                throw new BusinessException("Too many incorrect password attempts, account locked. Please try again in " + expire + " minutes!");
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Redis 不可用，跳过登录锁定检查，邮箱: {}", email, e);
         }
     }
 
@@ -45,27 +50,26 @@ public class LoginRateLimiter {
      * @param email 尝试登录的邮箱
      */
     public void recordFailedAttempt(String email) {
-        String attemptKey = ATTEMPT_KEY_PREFIX + email;
-        String lockKey = LOCK_KEY_PREFIX + email;
+        try {
+            String attemptKey = ATTEMPT_KEY_PREFIX + email;
+            String lockKey = LOCK_KEY_PREFIX + email;
 
-        // 递增失败次数，如果 key 不存在则初始化为 1 
-        Long count = stringRedisTemplate.opsForValue().increment(attemptKey);
-        
-        // 如果是第一次错误，设置过期时间为 24 小时
-        if (count != null && count == 1) {
-            stringRedisTemplate.expire(attemptKey, ATTEMPT_EXPIRE_HOURS, TimeUnit.HOURS);
-        }
+            Long count = stringRedisTemplate.opsForValue().increment(attemptKey);
 
-        if (count != null && count >= MAX_FAILED_ATTEMPTS) {
-            // 达到最大失败次数，锁定账号并设置锁定时间为 15 分钟
-            stringRedisTemplate.opsForValue().set(lockKey, "locked", LOCK_TIME_DURATION_MINUTES, TimeUnit.MINUTES);
-            // 锁定后清除当前的失败次数，避免解锁马上继续触发
-            stringRedisTemplate.delete(attemptKey);
-            
-            log.error("！！！！安全告警！！！！：邮箱 {} 连续输入错误密码达 {} 次，触发系统防爆破自保，账号封控锁定！", email, count);
-        } else {
-            long remaining = MAX_FAILED_ATTEMPTS - (count == null ? 0 : count);
-            log.warn("凭证校验失败：邮箱 {} 密码输入错误 {} 次，剩余允许重试次数 {}", email, count, remaining);
+            if (count != null && count == 1) {
+                stringRedisTemplate.expire(attemptKey, ATTEMPT_EXPIRE_HOURS, TimeUnit.HOURS);
+            }
+
+            if (count != null && count >= MAX_FAILED_ATTEMPTS) {
+                stringRedisTemplate.opsForValue().set(lockKey, "locked", LOCK_TIME_DURATION_MINUTES, TimeUnit.MINUTES);
+                stringRedisTemplate.delete(attemptKey);
+                log.error("！！！！安全告警！！！！：邮箱 {} 连续输入错误密码达 {} 次，触发系统防爆破自保，账号封控锁定！", email, count);
+            } else {
+                long remaining = MAX_FAILED_ATTEMPTS - (count == null ? 0 : count);
+                log.warn("凭证校验失败：邮箱 {} 密码输入错误 {} 次，剩余允许重试次数 {}", email, count, remaining);
+            }
+        } catch (Exception e) {
+            log.warn("Redis 不可用，跳过失败次数记录，邮箱: {}", email, e);
         }
     }
 
@@ -74,10 +78,13 @@ public class LoginRateLimiter {
      * @param email 成功登录的邮箱
      */
     public void clearLock(String email) {
-        String attemptKey = ATTEMPT_KEY_PREFIX + email;
-        String lockKey = LOCK_KEY_PREFIX + email;
-        
-        stringRedisTemplate.delete(attemptKey);
-        stringRedisTemplate.delete(lockKey);
+        try {
+            String attemptKey = ATTEMPT_KEY_PREFIX + email;
+            String lockKey = LOCK_KEY_PREFIX + email;
+            stringRedisTemplate.delete(attemptKey);
+            stringRedisTemplate.delete(lockKey);
+        } catch (Exception e) {
+            log.warn("Redis 不可用，跳过登录锁定清除，邮箱: {}", email, e);
+        }
     }
 }

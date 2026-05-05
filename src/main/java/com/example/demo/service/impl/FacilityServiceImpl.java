@@ -21,6 +21,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -39,15 +40,19 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
     @Override
     public List<FacilityVO> getAllFacilities() {
         // 1. 尝试从 Redis 获取缓存
-        String cached = stringRedisTemplate.opsForValue().get(FACILITY_LIST_KEY);
-        if (cached != null) {
-            try {
-                log.debug("从 Redis 缓存获取设施列表");
-                return objectMapper.readValue(cached, new TypeReference<List<FacilityVO>>() {});
-            } catch (Exception e) {
-                log.warn("反序列化设施缓存失败，回退查库", e);
-                stringRedisTemplate.delete(FACILITY_LIST_KEY);
+        try {
+            String cached = stringRedisTemplate.opsForValue().get(FACILITY_LIST_KEY);
+            if (cached != null) {
+                try {
+                    log.debug("从 Redis 缓存获取设施列表");
+                    return objectMapper.readValue(cached, new TypeReference<List<FacilityVO>>() {});
+                } catch (Exception e) {
+                    log.warn("反序列化设施缓存失败，回退查库", e);
+                    stringRedisTemplate.delete(FACILITY_LIST_KEY);
+                }
             }
+        } catch (Exception e) {
+            log.warn("Redis 不可用，跳过缓存直接查库", e);
         }
 
         // 2. 缓存未命中，查数据库
@@ -172,8 +177,20 @@ public class FacilityServiceImpl extends ServiceImpl<FacilityMapper, Facility> i
     }
 
     private void clearFacilityCache() {
-        stringRedisTemplate.delete(FACILITY_LIST_KEY);
-        log.debug("设施列表缓存已清除");
+        // 立即删一次
+        deleteCacheKey();
+        // 延迟 500ms 再删一次：防止并发场景下"读DB→写缓存"覆盖刚刚的删除
+        CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS)
+                .execute(this::deleteCacheKey);
+    }
+
+    private void deleteCacheKey() {
+        try {
+            stringRedisTemplate.delete(FACILITY_LIST_KEY);
+            log.debug("设施列表缓存已清除");
+        } catch (Exception e) {
+            log.warn("Redis 不可用，设施缓存清除失败（数据已成功写入数据库）", e);
+        }
     }
 
     private FacilityVO convertToVO(Facility facility) {

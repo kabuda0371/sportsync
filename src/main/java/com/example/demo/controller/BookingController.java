@@ -7,6 +7,7 @@ import com.example.demo.common.UserContext;
 import com.example.demo.dto.BookingRequestDTO;
 import com.example.demo.dto.BookingStatusUpdateDTO;
 import com.example.demo.dto.FacilityQueryDTO;
+import com.example.demo.dto.InvitationResponseDTO;
 import com.example.demo.exception.BusinessException;
 import com.example.demo.service.BookingService;
 import com.example.demo.vo.BookingVO;
@@ -33,6 +34,7 @@ public class BookingController {
     private BookingService bookingService;
 
     @PostMapping("/create")
+    @PreAuthorize("hasRole('MEMBER')")
     @Operation(summary = "申请预订设施", description = "提交预订申请，需提供设施ID、日期及时间段")
     public Result<BookingVO> createBooking(@Valid @RequestBody BookingRequestDTO requestDTO) {
         Long userId = UserContext.getUserId();
@@ -43,6 +45,7 @@ public class BookingController {
     }
 
     @GetMapping("/my")
+    @PreAuthorize("hasRole('MEMBER')")
     @Operation(summary = "查看我的预订记录", description = "获取当前登录用户的所有预订历史及其状态")
     public Result<List<BookingVO>> getMyBookings() {
         Long userId = UserContext.getUserId();
@@ -53,6 +56,7 @@ public class BookingController {
     }
 
     @GetMapping("/upcoming")
+    @PreAuthorize("hasRole('MEMBER')")
     @Operation(summary = "查看即将进行的预订", description = "获取当前登录用户未来即将进行的预订")
     public Result<List<BookingVO>> getUpcomingBookings() {
         Long userId = UserContext.getUserId();
@@ -63,6 +67,7 @@ public class BookingController {
     }
 
     @GetMapping("/available")
+    @PreAuthorize("hasRole('MEMBER')")
     @Operation(summary = "查询设施已预订时段", description = "根据设施ID和日期，查询该日期下已被占用或待审批的时段，用于辅助用户选择可用时间数据。")
     public Result<List<BookingVO>> getAvailable(@ParameterObject @Valid FacilityQueryDTO query) {
         return Result.success(bookingService.getBookingsForFacilityAndDate(query.getFacilityId(), query.getDate()));
@@ -90,6 +95,7 @@ public class BookingController {
         return Result.success(null);
     }
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('MEMBER')")
     @Operation(summary = "取消预订", description = "会员取消自己的待处理预订（仅限 pending 状态）")
     public Result<Void> cancelBooking(
             @Parameter(description = "预订ID") @PathVariable Long id) {
@@ -98,6 +104,21 @@ public class BookingController {
             throw new BusinessException(401, "User not logged in");
         }
         bookingService.cancelBooking(userId, id);
+        return Result.success(null);
+    }
+
+    @PostMapping("/{id}/respond-invitation")
+    @PreAuthorize("hasRole('MEMBER')")
+    @Operation(summary = "受邀人响应携搭档预订邀约",
+            description = "搭档 B 接受或拒绝来自 A 的预订邀约。接受后订单进入 PENDING 等待审批；拒绝后从订单中移除受邀人，若所有邀约均已响应则订单进入 PENDING")
+    public Result<Void> respondToInvitation(
+            @Parameter(description = "预订ID") @PathVariable Long id,
+            @Valid @RequestBody InvitationResponseDTO responseDTO) {
+        Long inviteeId = UserContext.getUserId();
+        if (inviteeId == null) {
+            throw new BusinessException(401, "User not logged in");
+        }
+        bookingService.respondToInvitation(inviteeId, id, responseDTO.getAccept());
         return Result.success(null);
     }
 

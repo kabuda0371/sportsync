@@ -30,6 +30,7 @@ public class EquipmentReportController {
     private EquipmentReportService equipmentReportService;
 
     @PostMapping
+    @PreAuthorize("hasRole('MEMBER')")
     public Result<EquipmentReportVO> createReport(@Valid @RequestBody CreateReportDTO dto) {
         Long userId = UserContext.getUserId();
         if (userId == null) {
@@ -39,6 +40,7 @@ public class EquipmentReportController {
     }
 
     @GetMapping("/my")
+    @PreAuthorize("hasRole('MEMBER')")
     public Result<List<EquipmentReportVO>> getMyReports() {
         Long userId = UserContext.getUserId();
         if (userId == null) {

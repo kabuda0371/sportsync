@@ -4,6 +4,7 @@ import com.example.demo.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -39,6 +40,7 @@ public class SecurityConfig {
                 
                 // 3. 配置路径拦截规则
                 .authorizeHttpRequests(authz -> authz
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // 放行 Swagger 和 API Docs
                         .requestMatchers(
                                 "/swagger-ui/**",
@@ -51,7 +53,9 @@ public class SecurityConfig {
                                 "/api/users/register",
                                 "/api/users/google-login",
                                 "/api/users/verify-email",
-                                "/api/users/resend-verification"
+                                "/api/users/resend-verification",
+                                "/api/users/forgot-password",
+                                "/api/users/reset-password"
                         ).permitAll()
                         // 其他所有接口均需认证
                         .anyRequest().authenticated()
@@ -78,7 +82,7 @@ public class SecurityConfig {
                 "https://sportsyncs.org",
                 "http://sportsyncs.org"
         ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 

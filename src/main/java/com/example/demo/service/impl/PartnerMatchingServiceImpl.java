@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -10,11 +11,13 @@ import com.example.demo.entity.PartnerRequest;
 import com.example.demo.entity.User;
 import com.example.demo.enums.AccountStatusEnum;
 import com.example.demo.enums.AvailabilityEnum;
+import com.example.demo.enums.NotificationTypeEnum;
 import com.example.demo.enums.PartnerRequestStatusEnum;
 import com.example.demo.enums.SkillLevelEnum;
 import com.example.demo.enums.SportEnum;
 import com.example.demo.exception.BusinessException;
 import com.example.demo.mapper.PartnerRequestMapper;
+import com.example.demo.service.NotificationService;
 import com.example.demo.service.PartnerMatchingService;
 import com.example.demo.service.UserService;
 import com.example.demo.vo.PartnerMatchVO;
@@ -41,6 +44,7 @@ public class PartnerMatchingServiceImpl extends ServiceImpl<PartnerRequestMapper
 
     private final UserService userService;
     private final UserConverter userConverter;
+    private final NotificationService notificationService;
     private final com.example.demo.mapper.UserMapper userMapper;
 
     @Override
@@ -202,6 +206,13 @@ public class PartnerMatchingServiceImpl extends ServiceImpl<PartnerRequestMapper
 
         this.save(request);
 
+        notificationService.sendNotification(
+                targetUser.getId(),
+                NotificationTypeEnum.PARTNER_REQUEST_RECEIVED.getValue(),
+                request.getId(),
+                null,
+                "Partner request from " + currentUser.getName() + ".");
+
         log.info("伙伴配对请求已发送，requesterId: {}, targetId: {}", userId, dto.getTargetId());
 
         return buildRequestVO(request, currentUser.getName(), targetUser.getName());
@@ -247,15 +258,33 @@ public class PartnerMatchingServiceImpl extends ServiceImpl<PartnerRequestMapper
             throw new BusinessException(403, "You can only handle requests sent to you");
         }
 
-        if (!PartnerRequestStatusEnum.PENDING.getValue().equals(request.getStatus())) {
+        // WHERE targetId + status='pending' 原子执行，防止重复处理
+        boolean updated = this.update(null, new LambdaUpdateWrapper<PartnerRequest>()
+                .eq(PartnerRequest::getId, requestId)
+                .eq(PartnerRequest::getTargetId, userId)
+                .eq(PartnerRequest::getStatus, PartnerRequestStatusEnum.PENDING.getValue())
+                .set(PartnerRequest::getStatus, status));
+        if (!updated) {
             throw new BusinessException(400, "This request has already been processed");
         }
 
-        request.setStatus(status);
-        this.updateById(request);
-
         User requester = userService.getById(request.getRequesterId());
         User target = userService.getById(request.getTargetId());
+        request.setStatus(status);
+
+        if (requester != null && target != null) {
+            String notifyMessage = PartnerRequestStatusEnum.ACCEPTED.getValue().equals(status)
+                    ? "Partner request accepted by " + target.getName() + "."
+                    : "Partner request declined by " + target.getName() + ".";
+            notificationService.sendNotification(
+                    requester.getId(),
+                    PartnerRequestStatusEnum.ACCEPTED.getValue().equals(status)
+                            ? NotificationTypeEnum.PARTNER_REQUEST_ACCEPTED.getValue()
+                            : NotificationTypeEnum.PARTNER_REQUEST_REJECTED.getValue(),
+                    request.getId(),
+                    null,
+                    notifyMessage);
+        }
 
         log.info("伙伴配对请求已处理，requestId: {}, status: {}", requestId, status);
 
@@ -325,6 +354,33 @@ public class PartnerMatchingServiceImpl extends ServiceImpl<PartnerRequestMapper
         resultPage.setRecords(start < voList.size() ? voList.subList(start, end) : List.of());
         resultPage.setTotal(voList.size());
         return resultPage;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removePartner(Long userId, Long partnerId) {
+        if (userId.equals(partnerId)) {
+            throw new BusinessException(400, "Invalid partner ID");
+        }
+
+        PartnerRequest request = this.lambdaQuery()
+                .eq(PartnerRequest::getStatus, PartnerRequestStatusEnum.ACCEPTED.getValue())
+                .and(w -> w
+                        .and(inner -> inner
+                                .eq(PartnerRequest::getRequesterId, userId)
+                                .eq(PartnerRequest::getTargetId, partnerId))
+                        .or(inner -> inner
+                                .eq(PartnerRequest::getRequesterId, partnerId)
+                                .eq(PartnerRequest::getTargetId, userId)))
+                .one();
+
+        if (request == null) {
+            throw new BusinessException(404, "No accepted partner relationship found with this user");
+        }
+
+        this.removeById(request.getId());
+
+        log.info("伙伴关系已解除，userId: {}, partnerId: {}", userId, partnerId);
     }
 
     /**

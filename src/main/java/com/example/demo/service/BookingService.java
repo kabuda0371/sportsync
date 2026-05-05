@@ -19,4 +19,12 @@ public interface BookingService extends IService<Booking> {
     void updateBookingStatus(Long staffId, Long bookingId, BookingStatusUpdateDTO reviewDTO);
     void cancelBooking(Long userId, Long bookingId);
     void markBookingCompleted(Long staffId, Long bookingId);
+
+    /**
+     * 携搭档预订 — 受邀人响应邀约
+     * @param inviteeId 当前登录用户（B）
+     * @param bookingId 邀约对应的预订
+     * @param accept    true=接受，false=拒绝
+     */
+    void respondToInvitation(Long inviteeId, Long bookingId, boolean accept);
 }

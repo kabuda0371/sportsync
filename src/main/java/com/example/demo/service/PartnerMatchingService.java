@@ -50,4 +50,9 @@ public interface PartnerMatchingService extends IService<PartnerRequest> {
      * 获取我的伙伴列表（已接受的伙伴关系）
      */
     IPage<PartnerMatchVO> getMyPartners(Long userId, int page, int size);
+
+    /**
+     * 解除与指定伙伴的关系（删除双方之间已接受的请求记录）
+     */
+    void removePartner(Long userId, Long partnerId);
 }

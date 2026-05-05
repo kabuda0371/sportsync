@@ -1,14 +1,14 @@
 package com.example.demo.vo;
 
-import lombok.Data;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -16,30 +16,48 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BookingVO {
-    @Schema(description = "预订记录ID")
+    @Schema(description = "Booking record ID")
     private Long id;
-    @Schema(description = "用户ID")
+
+    @Schema(description = "Booking owner user ID")
     private Long userId;
-    @Schema(description = "设施ID")
+
+    @Schema(description = "Facility ID")
     private Long facilityId;
-    @Schema(description = "预订日期")
+
+    @Schema(description = "Booking date")
     private LocalDate bookingDate;
-    @Schema(description = "开始时间")
+
+    @Schema(description = "Start time")
     private LocalTime startTime;
-    @Schema(description = "结束时间")
+
+    @Schema(description = "End time")
     private LocalTime endTime;
-    @Schema(description = "预订状态 (pending, approved, rejected, cancelled)")
+
+    @Schema(description = "Booking status: awaiting_partner, pending, approved, rejected, cancelled, completed")
     private String status;
-    @Schema(description = "活动描述，会员提交预订时填写的预期活动内容")
+
+    @Schema(description = "Activity description provided during booking")
     private String activityDescription;
-    @Schema(description = "工作人员审批备注")
+
+    @Schema(description = "Staff note")
     private String staffNote;
-    @Schema(description = "建议替代设施ID（当拒绝时工作人员可提供替代方案）")
+
+    @Schema(description = "Suggested alternative facility ID")
     private Long suggestedFacilityId;
-    @Schema(description = "共享预订伙伴用户ID列表")
+
+    @Schema(description = "Accepted partner user IDs")
     private List<Long> partnerIds;
-    @Schema(description = "共享预订伙伴姓名列表")
+
+    @Schema(description = "Accepted partner names")
     private List<String> partnerNames;
-    @Schema(description = "创建时间")
+
+    @Schema(description = "Invitation response details for each invited partner")
+    private List<InvitationMemberStatusVO> invitationStatuses;
+
+    @Schema(description = "Current viewer invitation status: pending, accepted, declined")
+    private String myInvitationStatus;
+
+    @Schema(description = "Created time")
     private LocalDateTime createdAt;
 }

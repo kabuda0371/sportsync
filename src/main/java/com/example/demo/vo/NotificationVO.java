@@ -12,21 +12,27 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "通知信息")
+@Schema(description = "Notification payload")
 public class NotificationVO {
 
-    @Schema(description = "通知ID")
+    @Schema(description = "Notification ID")
     private Long id;
 
-    @Schema(description = "关联的预订ID")
+    @Schema(description = "Notification type")
+    private String type;
+
+    @Schema(description = "Related business entity ID")
+    private Long relatedId;
+
+    @Schema(description = "Related booking ID")
     private Long bookingId;
 
-    @Schema(description = "通知内容")
+    @Schema(description = "Notification message")
     private String message;
 
-    @Schema(description = "是否已读")
+    @Schema(description = "Whether the notification has been read")
     private Boolean isRead;
 
-    @Schema(description = "通知创建时间")
+    @Schema(description = "Notification creation time")
     private LocalDateTime createdAt;
 }

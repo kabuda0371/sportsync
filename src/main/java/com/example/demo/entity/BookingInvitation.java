@@ -16,24 +16,19 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("notifications")
-public class Notification {
+@TableName("booking_invitations")
+public class BookingInvitation {
 
-    @TableId(value = "notification_id", type = IdType.AUTO)
+    @TableId(value = "invitation_id", type = IdType.AUTO)
     private Long id;
-
-    private Long userId;
-
-    private String type;
-
-    private Long relatedId;
 
     private Long bookingId;
 
-    private String message;
+    private Long inviteeId;
 
-    @Builder.Default
-    private Boolean isRead = false;
+    private String status;
+
+    private LocalDateTime respondedAt;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

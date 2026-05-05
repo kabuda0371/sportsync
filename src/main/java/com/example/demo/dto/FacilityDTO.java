@@ -3,6 +3,8 @@ package com.example.demo.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -39,8 +41,12 @@ public class FacilityDTO {
     private Long assignedStaffId;
 
     @Schema(description = "纬度", example = "51.5074")
+    @DecimalMin(value = "-90.0", message = "Latitude must be >= -90")
+    @DecimalMax(value = "90.0", message = "Latitude must be <= 90")
     private Double latitude;
 
     @Schema(description = "经度", example = "-0.1278")
+    @DecimalMin(value = "-180.0", message = "Longitude must be >= -180")
+    @DecimalMax(value = "180.0", message = "Longitude must be <= 180")
     private Double longitude;
 }

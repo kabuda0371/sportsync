@@ -14,8 +14,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 
 import jakarta.validation.Valid;
 
+import com.example.demo.dto.CreateInternalUserDTO;
 import com.example.demo.dto.GoogleLoginDTO;
+import com.example.demo.dto.ForgotPasswordRequestDTO;
 import com.example.demo.dto.ProfileUpdateDTO;
+import com.example.demo.dto.ResetPasswordDTO;
 import com.example.demo.dto.ResendVerificationDTO;
 import com.example.demo.dto.UserRegisterDTO;
 import com.example.demo.dto.UserLoginDTO;
@@ -65,6 +68,20 @@ public class UserController {
         return Result.success("登录成功", userVO);
     }
 
+    @PostMapping("/forgot-password")
+    @Operation(summary = "发送密码重置验证码", description = "向已注册的本地账号邮箱发送 6 位密码重置验证码")
+    public Result<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO forgotPasswordRequestDTO) {
+        userService.sendPasswordResetCode(forgotPasswordRequestDTO.getEmail());
+        return Result.success("If the account exists, a password reset code has been sent to your email.", null);
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "重置密码", description = "使用邮箱、验证码和新密码完成密码重置")
+    public Result<Void> resetPassword(@Valid @RequestBody ResetPasswordDTO resetPasswordDTO) {
+        userService.resetPassword(resetPasswordDTO);
+        return Result.success("Password reset successful. Please log in with your new password.", null);
+    }
+
     @PostMapping("/google-login")
     @Operation(summary = "Google 第三方登录", description = "使用 Google ID Token 进行第三方登录，首次登录会自动注册")
     public Result<UserVO> googleLogin(@Valid @RequestBody GoogleLoginDTO googleLoginDTO) {
@@ -104,8 +121,18 @@ public class UserController {
             @Parameter(description = "每页条数，默认10") @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "角色过滤：member/staff/admin") @RequestParam(required = false) String role,
             @Parameter(description = "账号状态过滤：pending/approved/suspended") @RequestParam(required = false) String status) {
-        IPage<UserVO> result = userService.listUsers(page, size, role, status);
+        Long adminId = UserContext.getUserId();
+        IPage<UserVO> result = userService.listUsers(adminId, page, size, role, status);
         return Result.success("查询成功", result);
+    }
+
+    @PostMapping("/internal")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "创建内部员工账号", description = "管理员直接创建 Staff 或 Admin 账号，账号立即激活，无需邮箱验证")
+    public Result<UserVO> createInternalUser(@Valid @RequestBody CreateInternalUserDTO dto) {
+        Long adminId = UserContext.getUserId();
+        UserVO userVO = userService.createInternalUser(adminId, dto);
+        return Result.success("Internal account created successfully", userVO);
     }
 
     @PutMapping("/{id}/status")
@@ -114,7 +141,8 @@ public class UserController {
     public Result<Void> updateUserStatus(
             @Parameter(description = "用户ID") @PathVariable Long id,
             @Parameter(description = "新状态") @RequestParam String status) {
-        userService.updateUserStatus(id, status);
+        Long adminId = UserContext.getUserId();
+        userService.updateUserStatus(adminId, id, status);
         return Result.success("用户状态更新成功", null);
     }
 }

@@ -5,8 +5,10 @@ import com.example.demo.common.UserContext;
 import com.example.demo.exception.BusinessException;
 import com.example.demo.converter.UserConverter;
 import com.example.demo.utils.JwtUtil;
+import com.example.demo.dto.CreateInternalUserDTO;
 import com.example.demo.dto.GoogleLoginDTO;
 import com.example.demo.dto.ProfileUpdateDTO;
+import com.example.demo.dto.ResetPasswordDTO;
 import com.example.demo.dto.UserLoginDTO;
 import com.example.demo.dto.UserRegisterDTO;
 import com.example.demo.entity.User;
@@ -14,8 +16,8 @@ import com.example.demo.enums.AccountStatusEnum;
 import com.example.demo.enums.AuthProviderEnum;
 import com.example.demo.enums.UserRoleEnum;
 import com.example.demo.mapper.UserMapper;
+import com.example.demo.security.LoginRateLimiter;
 import com.example.demo.service.UserService;
-import com.example.demo.vo.UserVO;
 import com.example.demo.vo.UserVO;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -30,7 +32,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.example.demo.security.LoginRateLimiter;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -61,6 +62,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     private static final String VERIFY_CODE_KEY_PREFIX = "verify:code:";
     private static final String VERIFY_COOLDOWN_KEY_PREFIX = "verify:cooldown:";
+    private static final String RESET_CODE_KEY_PREFIX = "password-reset:code:";
+    private static final String RESET_COOLDOWN_KEY_PREFIX = "password-reset:cooldown:";
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -122,7 +125,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 生成6位数字验证码并存入 Redis
         String verifyCode = generateVerificationCode();
         String redisKey = VERIFY_CODE_KEY_PREFIX + registerDTO.getEmail();
-        stringRedisTemplate.opsForValue().set(redisKey, verifyCode, codeExpireMinutes, TimeUnit.MINUTES);
+        try {
+            stringRedisTemplate.opsForValue().set(redisKey, verifyCode, codeExpireMinutes, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.error("Redis 不可用，无法存储注册验证码，邮箱: {}", registerDTO.getEmail(), e);
+            throw new BusinessException("Email verification service is temporarily unavailable. Please try again later.");
+        }
 
         // 发送验证码邮件
         emailService.sendVerificationCode(registerDTO.getEmail(), verifyCode);
@@ -209,8 +217,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public IPage<UserVO> listUsers(int page, int size, String role, String status) {
+    public IPage<UserVO> listUsers(Long adminId, int page, int size, String role, String status) {
+        if (adminId == null) {
+            throw new BusinessException(401, "User not logged in");
+        }
+
         IPage<User> userPage = this.lambdaQuery()
+                .ne(User::getId, adminId)
                 .eq(role != null && !role.isBlank(), User::getRole, role)
                 .eq(status != null && !status.isBlank(), User::getAccountStatus, status)
                 .orderByDesc(User::getId)
@@ -223,10 +236,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateUserStatus(Long userId, String status) {
+    public void updateUserStatus(Long adminId, Long userId, String status) {
+        if (adminId == null) {
+            throw new BusinessException(401, "User not logged in");
+        }
+
+        if (adminId.equals(userId)) {
+            throw new BusinessException(403, "Administrators cannot change their own account status");
+        }
+
         User user = this.getById(userId);
         if (user == null) {
             throw new BusinessException(404, "User not found");
+        }
+
+        if (UserRoleEnum.ADMIN.getValue().equalsIgnoreCase(user.getRole())) {
+            throw new BusinessException(403, "Administrator accounts cannot be managed from this endpoint");
         }
         
         // 校验状态值是否合法
@@ -341,7 +366,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 1. 从 Redis 获取验证码
         String redisKey = VERIFY_CODE_KEY_PREFIX + email;
-        String storedCode = stringRedisTemplate.opsForValue().get(redisKey);
+        String storedCode;
+        try {
+            storedCode = stringRedisTemplate.opsForValue().get(redisKey);
+        } catch (Exception e) {
+            log.error("Redis 不可用，无法获取验证码，邮箱: {}", email, e);
+            throw new BusinessException("Verification service is temporarily unavailable. Please try again later.");
+        }
 
         if (storedCode == null) {
             throw new BusinessException("Verification code has expired or does not exist, please request a new one!");
@@ -372,7 +403,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         this.updateById(user);
 
         // 6. 验证成功后删除 Redis 中的验证码
-        stringRedisTemplate.delete(redisKey);
+        try {
+            stringRedisTemplate.delete(redisKey);
+        } catch (Exception e) {
+            log.warn("Redis 不可用，验证码清除失败，邮箱: {}", email, e);
+        }
 
         log.info("邮箱验证成功，用户ID: {}, 邮箱: {}", user.getId(), email);
     }
@@ -383,9 +418,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 1. 检查冷却时间
         String cooldownKey = VERIFY_COOLDOWN_KEY_PREFIX + email;
-        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(cooldownKey))) {
-            Long ttl = stringRedisTemplate.getExpire(cooldownKey, TimeUnit.SECONDS);
-            throw new BusinessException("Please wait " + ttl + " seconds before requesting a new verification code!");
+        try {
+            if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(cooldownKey))) {
+                Long ttl = stringRedisTemplate.getExpire(cooldownKey, TimeUnit.SECONDS);
+                throw new BusinessException("Please wait " + ttl + " seconds before requesting a new verification code!");
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Redis 不可用，跳过重发冷却检查，邮箱: {}", email, e);
         }
 
         // 2. 查询用户，确认存在且状态为 pending
@@ -405,10 +446,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 3. 生成新的验证码并存入 Redis
         String verifyCode = generateVerificationCode();
         String redisKey = VERIFY_CODE_KEY_PREFIX + email;
-        stringRedisTemplate.opsForValue().set(redisKey, verifyCode, codeExpireMinutes, TimeUnit.MINUTES);
-
-        // 4. 设置冷却标记
-        stringRedisTemplate.opsForValue().set(cooldownKey, "1", resendCooldownSeconds, TimeUnit.SECONDS);
+        try {
+            stringRedisTemplate.opsForValue().set(redisKey, verifyCode, codeExpireMinutes, TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(cooldownKey, "1", resendCooldownSeconds, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Redis 不可用，无法存储重发验证码，邮箱: {}", email, e);
+            throw new BusinessException("Email verification service is temporarily unavailable. Please try again later.");
+        }
 
         // 5. 发送邮件
         emailService.sendVerificationCode(email, verifyCode);
@@ -418,6 +462,135 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     /**
      * 生成6位数字验证码
      */
+    @Override
+    public void sendPasswordResetCode(String email) {
+        log.info("Password reset code requested, email: {}", email);
+
+        User user = this.lambdaQuery()
+                .eq(User::getEmail, email)
+                .last("LIMIT 1")
+                .one();
+
+        if (user == null) {
+            log.info("Password reset requested for non-existent email: {}", email);
+            throw new BusinessException("This email is not registered.");
+        }
+
+        if (!AuthProviderEnum.LOCAL.getValue().equals(user.getAuthProvider())) {
+            log.info("Password reset skipped for third-party account, email: {}", email);
+            throw new BusinessException("This account uses Google sign-in. Please continue with Google.");
+        }
+
+        if (AccountStatusEnum.SUSPENDED.getValue().equals(user.getAccountStatus())) {
+            log.warn("Password reset skipped for suspended account, email: {}", email);
+            throw new BusinessException("Your account has been banned. Please contact customer service!");
+        }
+
+        String cooldownKey = RESET_COOLDOWN_KEY_PREFIX + email;
+        try {
+            if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(cooldownKey))) {
+                Long ttl = stringRedisTemplate.getExpire(cooldownKey, TimeUnit.SECONDS);
+                throw new BusinessException("Please wait " + ttl + " seconds before requesting a new reset code!");
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Redis 不可用，跳过密码重置冷却检查，邮箱: {}", email, e);
+        }
+
+        String resetCode = generateVerificationCode();
+        String redisKey = RESET_CODE_KEY_PREFIX + email;
+        try {
+            stringRedisTemplate.opsForValue().set(redisKey, resetCode, codeExpireMinutes, TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(cooldownKey, "1", resendCooldownSeconds, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Redis 不可用，无法存储密码重置码，邮箱: {}", email, e);
+            throw new BusinessException("Password reset service is temporarily unavailable. Please try again later.");
+        }
+
+        emailService.sendPasswordResetCode(email, resetCode);
+        log.info("Password reset code sent successfully, email: {}", email);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(ResetPasswordDTO resetPasswordDTO) {
+        String email = resetPasswordDTO.getEmail();
+        String redisKey = RESET_CODE_KEY_PREFIX + email;
+        String storedCode;
+        try {
+            storedCode = stringRedisTemplate.opsForValue().get(redisKey);
+        } catch (Exception e) {
+            log.error("Redis 不可用，无法获取密码重置码，邮箱: {}", email, e);
+            throw new BusinessException("Password reset service is temporarily unavailable. Please try again later.");
+        }
+
+        if (storedCode == null) {
+            throw new BusinessException("Reset code has expired or does not exist, please request a new one!");
+        }
+
+        if (!storedCode.equals(resetPasswordDTO.getCode())) {
+            throw new BusinessException("Invalid reset code!");
+        }
+
+        User user = this.lambdaQuery()
+                .eq(User::getEmail, email)
+                .last("LIMIT 1")
+                .one();
+
+        if (user == null) {
+            throw new BusinessException("User not found!");
+        }
+
+        if (!AuthProviderEnum.LOCAL.getValue().equals(user.getAuthProvider())) {
+            throw new BusinessException("This account uses Google sign-in. Please continue with Google.");
+        }
+
+        if (AccountStatusEnum.SUSPENDED.getValue().equals(user.getAccountStatus())) {
+            throw new BusinessException("Your account has been banned. Please contact customer service!");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(resetPasswordDTO.getNewPassword()));
+        this.updateById(user);
+
+        try {
+            stringRedisTemplate.delete(redisKey);
+            stringRedisTemplate.delete(RESET_COOLDOWN_KEY_PREFIX + email);
+        } catch (Exception e) {
+            log.warn("Redis 不可用，密码重置码清除失败，邮箱: {}", email, e);
+        }
+        loginRateLimiter.clearLock(email);
+
+        log.info("Password reset successful, userId: {}, email: {}", user.getId(), email);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserVO createInternalUser(Long adminId, CreateInternalUserDTO dto) {
+        String role = dto.getRole().toLowerCase();
+        if (!UserRoleEnum.STAFF.getValue().equals(role) && !UserRoleEnum.ADMIN.getValue().equals(role)) {
+            throw new BusinessException(400, "Role must be 'staff' or 'admin'");
+        }
+
+        User user = User.builder()
+                .email(dto.getEmail())
+                .passwordHash(passwordEncoder.encode(dto.getPassword()))
+                .name(dto.getName())
+                .role(role)
+                .accountStatus(AccountStatusEnum.APPROVED.getValue())
+                .authProvider(AuthProviderEnum.LOCAL.getValue())
+                .build();
+
+        try {
+            this.save(user);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("Email is already registered!");
+        }
+
+        log.info("Admin {} created internal {} account, new userId: {}", adminId, role, user.getId());
+        return userConverter.toVO(user);
+    }
+
     private String generateVerificationCode() {
         int code = (int) ((Math.random() * 900000) + 100000);
         return String.valueOf(code);

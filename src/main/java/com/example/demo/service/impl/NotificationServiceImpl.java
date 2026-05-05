@@ -19,9 +19,11 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void sendNotification(Long userId, Long bookingId, String message) {
+    public void sendNotification(Long userId, String type, Long relatedId, Long bookingId, String message) {
         Notification notification = Notification.builder()
                 .userId(userId)
+                .type(type)
+                .relatedId(relatedId)
                 .bookingId(bookingId)
                 .message(message)
                 .isRead(false)
@@ -57,6 +59,8 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
     private NotificationVO convertToVO(Notification notification) {
         return NotificationVO.builder()
                 .id(notification.getId())
+                .type(notification.getType())
+                .relatedId(notification.getRelatedId())
                 .bookingId(notification.getBookingId())
                 .message(notification.getMessage())
                 .isRead(notification.getIsRead())
