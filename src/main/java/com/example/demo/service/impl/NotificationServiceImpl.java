@@ -6,7 +6,9 @@ import com.example.demo.entity.Notification;
 import com.example.demo.exception.BusinessException;
 import com.example.demo.mapper.NotificationMapper;
 import com.example.demo.service.NotificationService;
+import com.example.demo.service.UserService;
 import com.example.demo.vo.NotificationVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,9 +19,16 @@ import java.util.stream.Collectors;
 public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Notification>
         implements NotificationService {
 
+    @Autowired
+    private UserService userService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void sendNotification(Long userId, String type, Long relatedId, Long bookingId, String message) {
+        if (userId == null || userService.getById(userId) == null) {
+            return;
+        }
+
         Notification notification = Notification.builder()
                 .userId(userId)
                 .type(type)
