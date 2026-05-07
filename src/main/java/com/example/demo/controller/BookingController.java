@@ -47,12 +47,16 @@ public class BookingController {
     @GetMapping("/my")
     @PreAuthorize("hasRole('MEMBER')")
     @Operation(summary = "查看我的预订记录", description = "获取当前登录用户的所有预订历史及其状态")
-    public Result<List<BookingVO>> getMyBookings() {
+    public Result<List<BookingVO>> getMyBookings(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long facilityId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         Long userId = UserContext.getUserId();
         if (userId == null) {
             throw new BusinessException(401, "User not logged in");
         }
-        return Result.success(bookingService.getUserBookings(userId));
+        return Result.success(bookingService.getUserBookings(userId, status, facilityId, startDate, endDate));
     }
 
     @GetMapping("/upcoming")

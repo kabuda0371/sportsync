@@ -151,3 +151,4 @@ INSERT INTO facilities (
     ('Swimming Pool', 'Swimming', 'Olympic-size indoor swimming pool, 8 lanes.', 'Swim cap required. No diving in shallow end.', 20, 60, 51.5068, -0.1280),
     ('Gym Hall', 'Gym', 'Fully equipped gym with cardio and weight machines.', 'Wipe machines after use. Closed-toe shoes only.', 30, 60, 51.5085, -0.1275),
     ('Football Pitch', 'Football', 'Full-size outdoor football pitch with natural grass.', 'Football boots only. No bikes on pitch.', 22, 90, 51.5072, -0.1260);
+

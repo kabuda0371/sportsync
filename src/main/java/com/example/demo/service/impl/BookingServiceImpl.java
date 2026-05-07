@@ -106,6 +106,20 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         }
     }
 
+    private List<BookingInvitation> listInvitationsByBookingId(Long bookingId) {
+        return bookingInvitationMapper.selectList(new LambdaQueryWrapper<BookingInvitation>()
+                .eq(BookingInvitation::getBookingId, bookingId));
+    }
+
+    private List<Long> extractAcceptedInviteeIds(List<BookingInvitation> invitations) {
+        return invitations.stream()
+                .filter(invitation -> InvitationStatusEnum.ACCEPTED.getValue().equals(invitation.getStatus()))
+                .map(BookingInvitation::getInviteeId)
+                .filter(Objects::nonNull)
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
     private void requireAcceptedPartnership(Long userId, Long partnerId) {
         long acceptedCount = partnerRequestMapper.selectCount(
                 new LambdaQueryWrapper<PartnerRequest>()
@@ -262,14 +276,6 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         User booker = userService.getById(booking.getUserId());
         String inviteeName = invitee != null ? invitee.getName() : ("User " + inviteeId);
         String bookerName = booker != null ? booker.getName() : "Your partner";
-        List<BookingInvitation> otherActiveInvitees = accept
-                ? Collections.emptyList()
-                : bookingInvitationMapper.selectList(new LambdaQueryWrapper<BookingInvitation>()
-                .eq(BookingInvitation::getBookingId, bookingId)
-                .ne(BookingInvitation::getId, inv.getId())
-                .in(BookingInvitation::getStatus,
-                        InvitationStatusEnum.PENDING.getValue(),
-                        InvitationStatusEnum.ACCEPTED.getValue()));
 
         if (accept) {
             lockAndCheckUserConflict(inviteeId, booking.getBookingDate(),
@@ -289,62 +295,50 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
             throw new BusinessException(409, "Invitation status changed concurrently, please retry");
         }
 
-        if (accept) {
-            List<Long> currentPartners = new ArrayList<>(parsePartnerIds(booking.getPartnerIds()));
-            if (!currentPartners.contains(inviteeId)) {
-                currentPartners.add(inviteeId);
-            }
-            String newPartnerIds = joinPartnerIds(currentPartners);
-            boolean partnerWrite = this.update(null, new LambdaUpdateWrapper<Booking>()
-                    .eq(Booking::getId, bookingId)
-                    .eq(Booking::getStatus, BookingStatusEnum.AWAITING_PARTNER.getValue())
-                    .set(Booking::getPartnerIds, newPartnerIds));
-            if (!partnerWrite) {
-                throw new BusinessException(409, "Booking state changed concurrently (likely cancelled), please refresh");
-            }
-            booking.setPartnerIds(newPartnerIds);
+        List<BookingInvitation> refreshedInvitations = listInvitationsByBookingId(bookingId);
+        List<Long> acceptedInviteeIds = extractAcceptedInviteeIds(refreshedInvitations);
+        String acceptedPartnerIds = joinPartnerIds(acceptedInviteeIds);
+        long stillPending = refreshedInvitations.stream()
+                .filter(invitation -> InvitationStatusEnum.PENDING.getValue().equals(invitation.getStatus()))
+                .count();
+
+        LambdaUpdateWrapper<Booking> bookingUpdate = new LambdaUpdateWrapper<Booking>()
+                .eq(Booking::getId, bookingId)
+                .eq(Booking::getStatus, BookingStatusEnum.AWAITING_PARTNER.getValue())
+                .set(Booking::getPartnerIds, acceptedPartnerIds);
+
+        boolean bookingFinalized = false;
+        boolean finalizedAsPersonal = false;
+        if (stillPending == 0) {
+            bookingUpdate.set(Booking::getStatus, BookingStatusEnum.PENDING.getValue());
+            finalizedAsPersonal = acceptedInviteeIds.isEmpty();
         }
 
-        long stillPending = bookingInvitationMapper.countPending(bookingId);
-        boolean advanced = false;
-        if (accept && stillPending == 0) {
-            boolean adv = this.update(null, new LambdaUpdateWrapper<Booking>()
-                    .eq(Booking::getId, bookingId)
-                    .eq(Booking::getStatus, BookingStatusEnum.AWAITING_PARTNER.getValue())
-                    .set(Booking::getStatus, BookingStatusEnum.PENDING.getValue()));
-            advanced = adv;
+        boolean bookingUpdated = this.update(null, bookingUpdate);
+        if (!bookingUpdated) {
+            throw new BusinessException(409, "Booking state changed concurrently (likely cancelled), please refresh");
         }
-        boolean downgraded = false;
-        if (!accept) {
-            bookingInvitationMapper.update(null, new LambdaUpdateWrapper<BookingInvitation>()
-                    .eq(BookingInvitation::getBookingId, bookingId)
-                    .ne(BookingInvitation::getId, inv.getId())
-                    .in(BookingInvitation::getStatus,
-                            InvitationStatusEnum.PENDING.getValue(),
-                            InvitationStatusEnum.ACCEPTED.getValue())
-                    .set(BookingInvitation::getStatus, InvitationStatusEnum.DECLINED.getValue())
-                    .set(BookingInvitation::getRespondedAt, LocalDateTime.now()));
 
-            downgraded = this.update(null, new LambdaUpdateWrapper<Booking>()
-                    .eq(Booking::getId, bookingId)
-                    .eq(Booking::getStatus, BookingStatusEnum.AWAITING_PARTNER.getValue())
-                    .set(Booking::getStatus, BookingStatusEnum.PENDING.getValue())
-                    .set(Booking::getPartnerIds, null));
-            if (!downgraded) {
-                throw new BusinessException(409, "Booking state changed concurrently (likely cancelled), please refresh");
-            }
+        booking.setPartnerIds(acceptedPartnerIds);
+        if (stillPending == 0) {
             booking.setStatus(BookingStatusEnum.PENDING.getValue());
-            booking.setPartnerIds(null);
+            bookingFinalized = true;
         }
 
         String aMsg = accept
                 ? inviteeName + " has accepted your invitation for booking ID: " + bookingId + "."
-                : inviteeName + " has declined your invitation for booking ID: " + bookingId
-                + ". The booking has been downgraded to your personal booking and is now pending staff approval.";
+                : inviteeName + " has declined your invitation for booking ID: " + bookingId + ".";
         notificationService.sendNotification(booking.getUserId(), bookingId, aMsg);
-        if (advanced) {
-            String advanceMsg = "All partners have responded. Booking ID: " + bookingId
-                    + " is now pending staff approval.";
+
+        if (bookingFinalized) {
+            String advanceMsg;
+            if (finalizedAsPersonal) {
+                advanceMsg = "All invited partners have responded. Booking ID: " + bookingId
+                        + " now continues as your personal booking and is pending staff approval.";
+            } else {
+                advanceMsg = "All invited partners have responded. Booking ID: " + bookingId
+                        + " is now pending staff approval.";
+            }
             notificationService.sendNotification(booking.getUserId(), bookingId, advanceMsg);
         }
 
@@ -352,34 +346,52 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
                 ? "You have accepted the invitation from " + bookerName + " (Booking ID: " + bookingId + ")."
                 : "You have declined the invitation from " + bookerName + " (Booking ID: " + bookingId + ").";
         notificationService.sendNotification(inviteeId, bookingId, bMsg);
-        if (downgraded) {
-            String declineDowngradeMsg = "This shared booking (ID: " + bookingId
-                    + ") has been downgraded to a personal booking for " + bookerName + ".";
-            notificationService.sendNotification(inviteeId, bookingId, declineDowngradeMsg);
-
-            for (BookingInvitation otherInv : otherActiveInvitees) {
-                String otherMsg = "The shared training session (ID: " + bookingId + ") with " + bookerName
-                        + " has been downgraded to an individual booking because another invited partner declined. "
-                        + "You are no longer attached to this booking.";
-                notificationService.sendNotification(otherInv.getInviteeId(), bookingId, otherMsg);
-            }
-        }
     }
 
     @Override
     public List<BookingVO> getUserBookings(Long userId) {
-        List<Booking> owned = this.list(new LambdaQueryWrapper<Booking>()
-                .eq(Booking::getUserId, userId)
-                .orderByDesc(Booking::getBookingDate, Booking::getStartTime));
+        return getUserBookings(userId, null, null, null, null);
+    }
+
+    @Override
+    public List<BookingVO> getUserBookings(Long userId, String status, Long facilityId, LocalDate startDate, LocalDate endDate) {
+        LambdaQueryWrapper<Booking> ownedQuery = new LambdaQueryWrapper<Booking>()
+                .eq(Booking::getUserId, userId);
+        applyUserBookingFilters(ownedQuery, status, facilityId, startDate, endDate);
+        ownedQuery.orderByDesc(Booking::getBookingDate, Booking::getStartTime);
+        List<Booking> owned = this.list(ownedQuery);
 
         List<Long> invitedIds = bookingInvitationMapper.findVisibleBookingIdsForInvitee(userId);
         List<Booking> invited = invitedIds.isEmpty()
                 ? Collections.emptyList()
-                : this.list(new LambdaQueryWrapper<Booking>()
-                        .in(Booking::getId, invitedIds));
+                : this.list(buildInvitedBookingsQuery(invitedIds, status, facilityId, startDate, endDate));
 
         List<Booking> merged = mergeAndSortDesc(owned, invited);
         return convertToVOList(merged, userId);
+    }
+
+    private LambdaQueryWrapper<Booking> buildInvitedBookingsQuery(List<Long> invitedIds, String status, Long facilityId,
+                                                                  LocalDate startDate, LocalDate endDate) {
+        LambdaQueryWrapper<Booking> query = new LambdaQueryWrapper<Booking>()
+                .in(Booking::getId, invitedIds);
+        applyUserBookingFilters(query, status, facilityId, startDate, endDate);
+        return query;
+    }
+
+    private void applyUserBookingFilters(LambdaQueryWrapper<Booking> query, String status, Long facilityId,
+                                         LocalDate startDate, LocalDate endDate) {
+        if (status != null && !status.isBlank()) {
+            query.eq(Booking::getStatus, status);
+        }
+        if (facilityId != null) {
+            query.eq(Booking::getFacilityId, facilityId);
+        }
+        if (startDate != null) {
+            query.ge(Booking::getBookingDate, startDate);
+        }
+        if (endDate != null) {
+            query.le(Booking::getBookingDate, endDate);
+        }
     }
 
     @Override
@@ -675,8 +687,7 @@ public class BookingServiceImpl extends ServiceImpl<BookingMapper, Booking> impl
         List<Long> pIds = parsePartnerIds(booking.getPartnerIds());
         List<BookingInvitation> invitations = booking.getId() == null
                 ? Collections.emptyList()
-                : bookingInvitationMapper.selectList(new LambdaQueryWrapper<BookingInvitation>()
-                .eq(BookingInvitation::getBookingId, booking.getId()));
+                : listInvitationsByBookingId(booking.getId());
 
         Set<Long> relevantUserIds = new HashSet<>(pIds);
         invitations.stream()

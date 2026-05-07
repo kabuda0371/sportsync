@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.time.LocalDate;
 import java.util.stream.Collectors;
 
 @Service
@@ -115,8 +116,17 @@ public class EquipmentReportServiceImpl extends ServiceImpl<EquipmentReportMappe
 
     @Override
     public List<EquipmentReportVO> getMyReports(Long userId) {
+        return getMyReports(userId, null, null, null, null);
+    }
+
+    @Override
+    public List<EquipmentReportVO> getMyReports(Long userId, String status, Long facilityId, LocalDate startDate, LocalDate endDate) {
         return this.lambdaQuery()
                 .eq(EquipmentReport::getUserId, userId)
+                .eq(status != null && !status.isBlank(), EquipmentReport::getStatus, status)
+                .eq(facilityId != null, EquipmentReport::getFacilityId, facilityId)
+                .ge(startDate != null, EquipmentReport::getCreatedAt, startDate != null ? startDate.atStartOfDay() : null)
+                .lt(endDate != null, EquipmentReport::getCreatedAt, endDate != null ? endDate.plusDays(1).atStartOfDay() : null)
                 .orderByDesc(EquipmentReport::getCreatedAt)
                 .list()
                 .stream()

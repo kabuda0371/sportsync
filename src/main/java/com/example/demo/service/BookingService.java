@@ -13,6 +13,7 @@ import java.time.LocalDate;
 public interface BookingService extends IService<Booking> {
     BookingVO createBooking(Long userId, BookingRequestDTO requestDTO);
     List<BookingVO> getUserBookings(Long userId);
+    List<BookingVO> getUserBookings(Long userId, String status, Long facilityId, LocalDate startDate, LocalDate endDate);
     List<BookingVO> getUpcomingBookings(Long userId);
     List<BookingVO> getBookingsForFacilityAndDate(Long facilityId, LocalDate date);
     IPage<BookingVO> getPendingBookings(Long staffId, int page, int size, String status);

@@ -10,6 +10,7 @@ import com.example.demo.service.EquipmentReportService;
 import com.example.demo.vo.EquipmentReportVO;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -41,12 +43,16 @@ public class EquipmentReportController {
 
     @GetMapping("/my")
     @PreAuthorize("hasRole('MEMBER')")
-    public Result<List<EquipmentReportVO>> getMyReports() {
+    public Result<List<EquipmentReportVO>> getMyReports(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long facilityId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         Long userId = UserContext.getUserId();
         if (userId == null) {
             throw new BusinessException(401, "User not logged in");
         }
-        return Result.success(equipmentReportService.getMyReports(userId));
+        return Result.success(equipmentReportService.getMyReports(userId, status, facilityId, startDate, endDate));
     }
 
     @GetMapping
