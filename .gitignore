@@ -34,6 +34,15 @@ build/
 
 # Local secrets / overrides
 .env
-.env.local
+.env.*
+!.env.example
 src/main/resources/application-local.properties
 config/
+
+# Private keys and credential stores
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+secrets/
